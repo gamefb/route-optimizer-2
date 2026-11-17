@@ -1,0 +1,59 @@
+# Route Planner: internal tool. There is no login, so keep this on your
+# internal network and do not expose the port to the public internet.
+services:
+  web:
+    build: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    # The routing library is tested on x86-64. On an ARM machine (for example
+    # Apple Silicon) this line runs it under emulation; on x86-64 it changes nothing.
+    platform: linux/amd64
+    environment:
+      DATABASE_URL: postgresql+psycopg://routeplanner:${DB_PASSWORD:-routeplanner}@db:5432/routeplanner
+      MAP_DATA_DIR: /data
+      # The app's clock: decides when "today" starts and how backup files are dated.
+      TZ: ${TZ:-America/New_York}
+      # A backup file is written here every day; the folder below is on your own disk.
+      BACKUP_DIR: /backups
+      BACKUP_KEEP: ${BACKUP_KEEP:-30}
+      # Optional: load this map automatically the first time the app starts.
+      DEFAULT_REGION_NAME: ${DEFAULT_REGION_NAME:-}
+      DEFAULT_REGION_URL: ${DEFAULT_REGION_URL:-}
+      GEOCODER_USER_AGENT: ${GEOCODER_USER_AGENT:-route-planner-internal/1.0}
+      # Optional paid address lookup keys. They can also be saved in the app under Settings.
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-}
+      GEOCODIO_API_KEY: ${GEOCODIO_API_KEY:-}
+    volumes:
+      - mapdata:/data
+      - ${BACKUP_FOLDER:-./backups}:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: routeplanner
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-routeplanner}
+      POSTGRES_DB: routeplanner
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routeplanner"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mapdata:

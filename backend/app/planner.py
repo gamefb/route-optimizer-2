@@ -1,0 +1,403 @@
+"""Building a day's plan: who takes which stop, in what order.
+
+Two passes, so volunteers are used to the fullest their limits allow:
+  1. Volunteers get their usual stops, then spare room is filled with extras.
+  2. Staff split whatever is left.
+"""
+
+from __future__ import annotations
+
+import math
+import time
+
+from sqlalchemy.orm import Session
+
+from . import optimizer
+from .models import Driver, KnownAddress, Plan, PlanStop
+from .optimizer import Job, Vehicle, insertion_delta, path_cost
+from .parsing import zip5
+from .routing import Router
+
+SKILL_OPEN = 900_000
+SKILL_ZIP_BASE = 1_000_000
+PRIORITY_PINNED = 100
+STAFF_SHARE_SLACK = 1.2  # a staff driver may take up to 20% more than an even share
+
+
+class PlanError(Exception):
+    pass
+
+
+def working_drivers(db: Session, plan: Plan) -> list[Driver]:
+    ids = set(plan.working_driver_ids or [])
+    return [d for d in db.query(Driver).order_by(Driver.kind.desc(), Driver.name).all() if d.id in ids]
+
+
+def clock(start: str, seconds: float) -> str:
+    """Clock time a number of seconds after a start time such as "09:00"."""
+    try:
+        h, m = (int(x) for x in start.split(":"))
+    except ValueError:
+        h, m = 9, 0
+    total = (h * 60 + m + round(seconds / 60)) % (24 * 60)
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def compute(
+    db: Session, plan: Plan, router: Router, reshuffle: bool = False,
+    staff_balance: str = "stops", minutes_per_stop: int = 0,
+) -> dict:
+    """Work out the plan and return it. Nothing is saved; see apply_result.
+
+    staff_balance: how the leftover stops are shared among staff drivers.
+      "stops" roughly equal stop counts, "time" roughly equal driving time,
+      "off" minimize the total only (usually one staff driver gets nearly everything).
+    minutes_per_stop: time allowed at each stop, used only for estimated arrival times.
+      Volunteer route-time limits stay driving time only.
+    """
+    stops = list(plan.stops)
+    not_ready = [s for s in stops if s.match_state != "matched" or s.address is None]
+    if not_ready:
+        raise PlanError(f"{len(not_ready)} row(s) still need attention before routes can be built.")
+    if not stops:
+        raise PlanError("There are no stops for this day yet.")
+
+    all_drivers = {d.id: d for d in db.query(Driver).all()}
+    warnings: list[str] = []
+    drivers = []
+    for d in working_drivers(db, plan):
+        if d.has_locations:
+            drivers.append(d)
+        else:
+            warnings.append(f"{d.name} has no start and end location and was left out.")
+    if not drivers:
+        raise PlanError("No working driver has a start and end location set.")
+    volunteers = [d for d in drivers if d.is_volunteer]
+    staff = [d for d in drivers if not d.is_volunteer]
+
+    def unlimited(d: Driver) -> bool:
+        """A volunteer with no limits at all (and not locked) shares the leftover stops like staff."""
+        return d.is_volunteer and not d.is_locked and not d.max_stops and not d.max_route_minutes \
+            and not [z for z in (d.zip_codes or []) if str(z).strip()]
+
+    # Everyone who shares what the limited volunteers leave behind.
+    sharers = staff + [d for d in volunteers if unlimited(d)]
+    working_ids = {d.id for d in drivers}
+    order_modes: dict = {}  # routes are always optimized; a dispatcher can still arrange one by hand
+    objective = plan.objective if plan.objective in ("time", "distance") else "time"
+
+    # ---- every distinct place gets one row in the travel tables
+    points: list[tuple[float, float]] = []
+    index: dict[tuple[float, float], int] = {}
+
+    def loc(lat: float, lon: float) -> int:
+        key = (round(lat, 6), round(lon, 6))
+        if key not in index:
+            index[key] = len(points)
+            points.append(key)
+        return index[key]
+
+    stop_loc = {s.id: loc(s.address.lat, s.address.lon) for s in stops}
+    start_loc = {d.id: loc(d.start_lat, d.start_lon) for d in drivers}
+    end_loc = {d.id: loc(d.end_lat, d.end_lon) for d in drivers}
+
+    tables: dict[str, tuple[list, list]] = {}
+    for d in drivers:
+        profile = "nohw" if d.avoid_highways else "hw"
+        if profile not in tables:
+            tables[profile] = router.matrix(points, d.avoid_highways, objective == "distance")
+    profile_of = {d.id: ("nohw" if d.avoid_highways else "hw") for d in drivers}
+
+    def durations(d: Driver) -> list:
+        return tables[profile_of[d.id]][0]
+
+    def distances(d: Driver) -> list:
+        return tables[profile_of[d.id]][1]
+
+    def cost_table(d: Driver) -> list:
+        return distances(d) if objective == "distance" else durations(d)
+
+    # ---- who each stop is tied to before any optimizing
+    by_id = {s.id: s for s in stops}
+    pinned: dict[int, int] = {}  # stop id -> driver id
+    label: dict[int, str] = {}
+    covering: dict[int, int | None] = {}
+    for s in stops:
+        usual = all_drivers.get(s.address.usual_driver_id) if s.address.usual_driver_id else None
+        if usual is not None and not usual.is_volunteer:
+            usual = None
+        covering[s.id] = None
+        if s.manual_driver_id in working_ids:
+            pinned[s.id], label[s.id] = s.manual_driver_id, "manual"
+        elif usual is not None and (not reshuffle or usual.is_locked):
+            if usual.id in working_ids:
+                pinned[s.id], label[s.id] = usual.id, "usual"
+            else:
+                covering[s.id] = usual.id  # their volunteer is off today
+
+    zips_today = sorted({zip5(s.zip) for s in stops})
+    zip_skill = {z: SKILL_ZIP_BASE + i for i, z in enumerate(zips_today)}
+
+    routes: dict[int, list[int]] = {d.id: [] for d in drivers}
+    overflow: dict[int, int] = {}  # stop id -> volunteer whose limit it did not fit
+    forced: set[int] = set()
+
+    # ---- pass 1: volunteers
+    if volunteers:
+        vehicles, jobs = [], []
+        for d in volunteers:
+            skills = {d.id}
+            limits: dict = {}
+            if not d.is_locked and not unlimited(d):
+                skills.add(SKILL_OPEN)
+                wanted = [zip5(z) for z in (d.zip_codes or []) if str(z).strip()]
+                skills |= {zip_skill[z] for z in (wanted or zips_today) if z in zip_skill}
+                limits["max_tasks"] = d.max_stops
+                limits["max_travel_time"] = d.max_route_minutes * 60 if d.max_route_minutes else None
+            vehicles.append(Vehicle(d.id, start_loc[d.id], end_loc[d.id], profile_of[d.id], skills, **limits))
+        volunteer_ids = {d.id for d in volunteers}
+        for s in stops:
+            target = pinned.get(s.id)
+            if target in volunteer_ids:
+                jobs.append(Job(s.id, stop_loc[s.id], {target}, PRIORITY_PINNED))
+            elif target is None:
+                jobs.append(Job(s.id, stop_loc[s.id], {SKILL_OPEN, zip_skill[zip5(s.zip)]}, 0))
+        solved, left = optimizer.solve(vehicles, jobs, tables, objective)
+        for d in volunteers:
+            routes[d.id] = solved.get(d.id, [])
+        for sid in left:
+            target = pinned.get(sid)
+            if target is None:
+                continue  # an extra no volunteer could take; staff will
+            if label[sid] == "manual":
+                routes[target].append(sid)  # the dispatcher's choice stands; flagged below
+                forced.add(sid)
+            else:
+                overflow[sid] = target
+                del pinned[sid]
+
+        # A volunteer on list order is not re-sequenced, so check the limit in that order.
+        for d in volunteers:
+            if order_modes.get(str(d.id)) != "list":
+                continue
+            routes[d.id].sort(key=lambda sid: by_id[sid].seq)
+            if d.is_locked or not d.max_route_minutes:
+                continue
+            limit, table = d.max_route_minutes * 60, durations(d)
+
+            def trip(ids: list[int]) -> int:
+                return path_cost(table, start_loc[d.id], [stop_loc[i] for i in ids], end_loc[d.id])
+
+            while trip(routes[d.id]) > limit:
+                current = routes[d.id]
+                extras = [i for i in current if i not in pinned]
+                usual_here = [i for i in current if pinned.get(i) == d.id and label[i] == "usual"]
+                pool = extras or usual_here
+                if not pool:
+                    break
+                drop = min(pool, key=lambda i: trip([x for x in current if x != i]))
+                current.remove(drop)
+                if drop in pinned:
+                    overflow[drop] = d.id
+                    del pinned[drop]
+
+    # Unlimited volunteers keep their usual stops but take their share in the next pass.
+    for d in sharers:
+        routes[d.id] = []
+    taken = {sid for ids in routes.values() for sid in ids}
+
+    # ---- pass 2: staff take the rest
+    remaining = [s for s in stops if s.id not in taken]
+    unassigned: list[dict] = []
+    if remaining:
+        if sharers:
+            jobs = [
+                Job(s.id, stop_loc[s.id], {pinned[s.id]} if s.id in pinned else set(), 0) for s in remaining
+            ]
+
+            def staff_vehicles(cap: int | None) -> list[Vehicle]:
+                return [
+                    Vehicle(d.id, start_loc[d.id], end_loc[d.id], profile_of[d.id], {d.id}, max_tasks=cap)
+                    for d in sharers
+                ]
+
+            def staff_time(routes_by_id: dict[int, list[int]]) -> int:
+                return sum(
+                    path_cost(durations(d), start_loc[d.id], [stop_loc[i] for i in routes_by_id.get(d.id, [])], end_loc[d.id])
+                    for d in sharers if routes_by_id.get(d.id)
+                )
+
+            if staff_balance == "stops" and len(sharers) > 1:
+                cap = math.ceil(len(remaining) / len(sharers) * STAFF_SHARE_SLACK)
+                solved, left = optimizer.solve(staff_vehicles(cap), jobs, tables, objective)
+                if left:  # the even share did not fit (for example many manual moves)
+                    solved, left = optimizer.solve(staff_vehicles(None), jobs, tables, objective)
+            elif staff_balance == "time" and len(sharers) > 1:
+                # Find the total driving time first, then cap each driver near an even share of it.
+                # Splitting the work across drivers adds some driving, so loosen the cap until all stops fit.
+                solved, left = optimizer.solve(staff_vehicles(None), jobs, tables, objective)
+                share = staff_time(solved) / len(sharers)
+                for slack in (1.15, 1.3, 1.5, 1.8):
+                    capped = [
+                        Vehicle(v.id, v.start, v.end, v.profile, v.skills, max_travel_time=max(60, int(share * slack)))
+                        for v in staff_vehicles(None)
+                    ]
+                    trial, trial_left = optimizer.solve(capped, jobs, tables, objective)
+                    if not trial_left:
+                        solved, left = trial, trial_left
+                        break
+            else:
+                solved, left = optimizer.solve(staff_vehicles(None), jobs, tables, objective)
+            for d in sharers:
+                routes[d.id] = solved.get(d.id, [])
+            unassigned += [{"stop_id": sid, "reason": "Could not be placed on any route."} for sid in left]
+        else:
+            for s in remaining:
+                if s.id in overflow:
+                    reason = f"Over {all_drivers[overflow[s.id]].name}'s limit, and no staff driver is working."
+                elif all(v.is_locked for v in volunteers):
+                    reason = "Every working volunteer is locked, and no staff driver is working."
+                else:
+                    reason = "No working volunteer can take it within their limits, and no staff driver is working."
+                unassigned.append({"stop_id": s.id, "reason": reason})
+
+    # ---- final order, numbers and totals
+    assignments: dict[str, dict] = {}
+    route_out = []
+    start_time = plan.start_time or "09:00"
+    service_s = max(0, int(minutes_per_stop or 0)) * 60
+    manual_orders = plan.manual_orders or {}
+    day_start = start_time
+    for d in drivers:
+        start_time = d.start_time or day_start  # a driver's own start time wins over the day's
+        ids = routes[d.id]
+        mode = "list" if order_modes.get(str(d.id)) == "list" else "optimized"
+        by_hand = [i for i in manual_orders.get(str(d.id), []) if i in set(ids)]
+        if by_hand:
+            # The dispatcher arranged this route by hand; anything new goes on the end.
+            mode = "manual"
+            ids = by_hand + [i for i in ids if i not in set(by_hand)]
+        elif mode == "list":
+            ids = sorted(ids, key=lambda sid: by_id[sid].seq)
+        seq_locs = [stop_loc[i] for i in ids]
+        time_s = path_cost(durations(d), start_loc[d.id], seq_locs, end_loc[d.id]) if ids else 0
+        dist_m = path_cost(distances(d), start_loc[d.id], seq_locs, end_loc[d.id]) if ids else 0
+        counts = {"usual": 0, "added": 0, "covering": 0, "manual": 0, "staff": 0, "overflow": 0}
+        chain = [start_loc[d.id]] + seq_locs + [end_loc[d.id]]
+        driven = 0
+        for n, sid in enumerate(ids, start=1):
+            driven += durations(d)[chain[n - 1]][chain[n]]
+            arrive_s = driven + service_s * (n - 1)
+            if sid in pinned:
+                lab = label[sid]
+            elif sid in overflow:
+                lab = "overflow"
+            elif covering[sid] is not None:
+                lab = "covering"
+            else:
+                lab = "added" if d.is_volunteer else "staff"
+            counts[lab] += 1
+            assignments[str(sid)] = {
+                "driver_id": d.id, "label": lab, "stop_number": n,
+                "covering_for_id": overflow.get(sid) or covering[sid],
+                "eta": clock(start_time, arrive_s),
+                "added_time_s": insertion_delta(durations(d), chain[n - 1], chain[n], chain[n + 1]),
+                "added_distance_m": insertion_delta(distances(d), chain[n - 1], chain[n], chain[n + 1]),
+            }
+        over = []
+        if d.is_volunteer:
+            if d.max_stops and len(ids) > d.max_stops:
+                over.append(f"{len(ids)} stops, limit is {d.max_stops}")
+            if d.max_route_minutes and time_s > d.max_route_minutes * 60:
+                over.append(f"{round(time_s / 60)} min driving, limit is {d.max_route_minutes}")
+            outside = [i for i in ids if d.zip_codes and zip5(by_id[i].zip) not in {zip5(z) for z in d.zip_codes}]
+            if outside:
+                over.append(f"{len(outside)} stop(s) outside their zip codes")
+        shapes = []
+        if ids:
+            pts = [points[i] for i in chain]
+            shapes = router.route_shapes(pts, d.avoid_highways, objective == "distance")
+        route_out.append({
+            "driver_id": d.id, "name": d.name, "kind": d.kind, "color": d.color,
+            "locked": d.is_locked, "avoid_highways": d.avoid_highways, "order_mode": mode,
+            "stop_ids": ids, "stops": len(ids), "time_s": time_s, "distance_m": dist_m,
+            "counts": counts, "over_limit": over, "shapes": shapes,
+            "start_time": start_time,
+            "finish_time": clock(start_time, time_s + service_s * len(ids)) if ids else start_time,
+            "start": [d.start_lat, d.start_lon], "end": [d.end_lat, d.end_lon],
+            "limits": {
+                "max_stops": d.max_stops, "max_route_minutes": d.max_route_minutes,
+                "zip_codes": d.zip_codes or [],
+            } if d.is_volunteer else None,
+        })
+    for item in unassigned:
+        item["covering_for_id"] = overflow.get(item["stop_id"]) or covering[item["stop_id"]]
+
+    return {
+        "objective": objective,
+        "reshuffle": reshuffle,
+        "computed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "start_time": day_start,
+        "minutes_per_stop": service_s // 60,
+        "routes": route_out,
+        "assignments": assignments,
+        "unassigned": unassigned,
+        "warnings": warnings,
+        "totals": {
+            "time_s": sum(r["time_s"] for r in route_out),
+            "distance_m": sum(r["distance_m"] for r in route_out),
+            "stops": sum(r["stops"] for r in route_out),
+        },
+    }
+
+
+def apply_result(plan: Plan, result: dict) -> None:
+    """Save a computed plan onto the day's stops."""
+    for s in plan.stops:
+        a = result["assignments"].get(str(s.id))
+        if a:
+            s.driver_id, s.label, s.stop_number = a["driver_id"], a["label"], a["stop_number"]
+            s.covering_for_id = a["covering_for_id"]
+            s.eta = a.get("eta")
+            s.added_time_s, s.added_distance_m = a["added_time_s"], a["added_distance_m"]
+        else:
+            s.driver_id = s.stop_number = s.covering_for_id = s.eta = None
+            s.added_time_s = s.added_distance_m = None
+            s.label = ""
+    plan.result = result
+    plan.stale = False
+
+
+def apply_reshuffle_to_usual_stops(db: Session, plan: Plan, result: dict) -> None:
+    """After a complete reshuffle, the result becomes the volunteers' new usual stops.
+
+    Locked volunteers are untouched. Only addresses on this day's list change.
+    """
+    drivers = {d.id: d for d in db.query(Driver).all()}
+    for s in plan.stops:
+        addr: KnownAddress | None = s.address
+        if addr is None:
+            continue
+        current = drivers.get(addr.usual_driver_id) if addr.usual_driver_id else None
+        if current is not None and current.is_locked:
+            continue
+        a = result["assignments"].get(str(s.id))
+        new = drivers.get(a["driver_id"]) if a else None
+        if new is not None and new.is_volunteer and not new.is_locked and a["label"] != "manual":
+            addr.usual_driver_id = new.id
+        elif a is not None and a["label"] != "manual":
+            addr.usual_driver_id = None
+
+
+def summary(result: dict | None) -> dict | None:
+    """The numbers shown in a before/after comparison."""
+    if not result:
+        return None
+    return {
+        "totals": result["totals"],
+        "routes": [
+            {k: r[k] for k in ("driver_id", "name", "kind", "stops", "time_s", "distance_m", "over_limit", "limits", "locked")}
+            for r in result["routes"]
+        ],
+        "unassigned": len(result["unassigned"]),
+    }
