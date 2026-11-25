@@ -297,3 +297,51 @@ def test_several_near_matches_are_all_offered(client):
     pick = next(c for c in stop["candidates"] if c["street"] == "12 Gridd St")
     plan2 = client.post(f"/api/stops/{stop['id']}/confirm-match", json={"address_id": pick["id"]}).json()
     assert plan2["stops"][0]["match_state"] == "matched" and plan2["stops"][0]["address_id"] == pick["id"]
+
+
+def test_reordering_by_hand_does_not_rebuild_the_day(client, monkeypatch):
+    from app import optimizer
+
+    alex = make_driver(client, "Alex", at=(0, 0))
+    blair = make_driver(client, "Blair", at=(9, 9), avoid_highways=True)
+    built = compute(client, day(client, "2026-01-05", [alex, blair]))
+    solve, calls = optimizer.solve, []
+
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return solve(*args, **kwargs)
+
+    monkeypatch.setattr(optimizer, "solve", counted)
+
+    def routes(plan):
+        return {r["driver_id"]: r for r in plan["result"]["routes"]}
+
+    # Drag and drop, then an arrow: only Alex's route is redone.
+    wanted = list(reversed(routes(built)[alex["id"]]["stop_ids"]))
+    plan = client.post(f"/api/plans/{built['id']}/set-order", json={"driver_id": alex["id"], "stop_ids": wanted}).json()
+    plan = client.post(f"/api/stops/{wanted[1]}/reorder", json={"direction": -1}).json()
+    wanted[0], wanted[1] = wanted[1], wanted[0]
+    assert calls == []
+    quick = routes(plan)
+    assert quick[alex["id"]]["stop_ids"] == wanted and quick[alex["id"]]["order_mode"] == "manual"
+    assert quick[blair["id"]] == routes(built)[blair["id"]]
+    assert plan["result"]["totals"]["time_s"] == sum(r["time_s"] for r in quick.values())
+    numbers = {s["id"]: s["stop_number"] for s in plan["stops"] if s["driver_id"] == alex["id"]}
+    assert [numbers[i] for i in wanted] == list(range(1, len(wanted) + 1))
+    assert not plan["stale"]
+
+    # A full rebuild comes to exactly the same routes and arrival times.
+    rebuilt = compute(client, plan)
+    assert calls
+    assert routes(rebuilt) == quick
+    assert [(s["id"], s["stop_number"], s["eta"], s["label"]) for s in rebuilt["stops"]] == \
+        [(s["id"], s["stop_number"], s["eta"], s["label"]) for s in plan["stops"]]
+
+    # If something changed since the routes were built, reordering rebuilds the whole day as before.
+    calls.clear()
+    plan = client.put(f"/api/plans/{plan['id']}", json={"start_time": "10:00"}).json()
+    assert plan["stale"]
+    plan = client.post(f"/api/stops/{wanted[1]}/reorder", json={"direction": -1}).json()
+    assert calls and not plan["stale"]
+    assert routes(plan)[alex["id"]]["start_time"] == "10:00"
+    assert routes(plan)[blair["id"]]["start_time"] == "10:00"

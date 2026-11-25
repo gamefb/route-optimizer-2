@@ -784,6 +784,16 @@ def _run(db: Session, plan: Plan) -> dict:
         bad(str(exc), 422)
 
 
+def _apply_hand_order(db: Session, plan: Plan, driver_id: int) -> None:
+    """A driver's order was arranged by hand: redo just that route, or everything if the routes are out of date."""
+    try:
+        minutes = int(get_settings(db)["minutes_per_stop"] or 0)
+        result = planner.resequence(db, plan, get_router(), driver_id, minutes_per_stop=minutes)
+    except RoutingError as exc:
+        bad(str(exc), 422)
+    planner.apply_result(plan, result if result is not None else _run(db, plan))
+
+
 @app.post("/api/plans/{plan_id}/compute")
 def compute_plan(plan_id: int, db: Session = Depends(get_db)):
     plan = get_plan(db, plan_id)
@@ -912,7 +922,7 @@ def set_order(plan_id: int, body: OrderIn, db: Session = Depends(get_db)):
         bad("The route changed. Rebuild the routes, then try again.")
     plan.manual_orders = {**(plan.manual_orders or {}), str(body.driver_id): body.stop_ids}
     db.flush()
-    planner.apply_result(plan, _run(db, plan))
+    _apply_hand_order(db, plan, body.driver_id)
     db.commit()
     return plan_out(db, plan)
 
@@ -938,7 +948,7 @@ def reorder_stop(stop_id: int, body: ReorderIn, db: Session = Depends(get_db)):
         order[i], order[j] = order[j], order[i]
         plan.manual_orders = {**(plan.manual_orders or {}), str(stop.driver_id): order}
         db.flush()
-        planner.apply_result(plan, _run(db, plan))
+        _apply_hand_order(db, plan, stop.driver_id)
         db.commit()
     return plan_out(db, plan)
 

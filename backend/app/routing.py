@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import httpx
@@ -22,6 +23,7 @@ import valhalla
 DATA_DIR = Path(os.environ.get("MAP_DATA_DIR", "./data")).resolve()
 UNREACHABLE = 1_000_000  # seconds or meters used when no road connects two points
 MAX_SNAP_M = 1500  # an address further than this from any road is outside the map
+RECENT_TABLES = 8  # travel tables kept in memory, so re-ordering a route does not ask for them again
 
 
 class RoutingError(Exception):
@@ -35,6 +37,7 @@ class Router:
         self.state_file = self.data_dir / "region.json"
         self._lock = threading.Lock()
         self._actor = None
+        self._tables: OrderedDict[tuple, tuple[list, list]] = OrderedDict()
         self._build_thread: threading.Thread | None = None
         self.state = {"status": "none", "name": "", "url": "", "message": "", "dir": "", "built_at": None}
         self.pending = None  # progress of a build in flight
@@ -150,6 +153,7 @@ class Router:
             old_dir = self.state.get("dir")
             with self._lock:
                 self._actor = actor
+                self._tables.clear()  # they belong to the old map
             self.state = {
                 "status": "ready", "name": name, "url": url, "message": "",
                 "dir": str(region_dir), "built_at": time.strftime("%Y-%m-%d %H:%M"),
@@ -186,8 +190,13 @@ class Router:
         return {"auto": opts}
 
     def matrix(self, points: list[tuple[float, float]], avoid_highways: bool, shortest: bool):
-        """Travel time (s) and distance (m) between every pair of points."""
+        """Travel time (s) and distance (m) between every pair of points.
+
+        The last few answers are remembered: a day's places stay the same while the
+        dispatcher adjusts its routes. Callers must not change the tables they get back.
+        """
         actor = self._require()
+        key = (tuple(points), avoid_highways, shortest)
         locs = [{"lat": lat, "lon": lon} for lat, lon in points]
         req = {
             "sources": locs, "targets": locs, "costing": "auto", "units": "kilometers",
@@ -195,6 +204,9 @@ class Router:
         }
         try:
             with self._lock:
+                if key in self._tables:
+                    self._tables.move_to_end(key)
+                    return self._tables[key]
                 res = actor.matrix(req)
         except Exception as exc:
             raise RoutingError(f"Could not compute travel times: {exc}") from exc
@@ -209,6 +221,10 @@ class Router:
                 t, d = cell.get("time"), cell.get("distance")
                 durations[i][j] = UNREACHABLE if t is None else int(round(t))
                 distances[i][j] = UNREACHABLE if d is None else int(round(d * 1000))
+        with self._lock:
+            self._tables[key] = (durations, distances)
+            while len(self._tables) > RECENT_TABLES:
+                self._tables.popitem(last=False)
         return durations, distances
 
     def route_shapes(self, points: list[tuple[float, float]], avoid_highways: bool, shortest: bool) -> list[str]:
