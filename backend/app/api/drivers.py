@@ -39,13 +39,23 @@ class DriverIn(BaseModel):
 
 def driver_out(d: Driver, usual_count: int = 0) -> dict:
     return {
-        "id": d.id, "name": d.name, "kind": d.kind, "color": d.color,
-        "start_label": d.start_label, "start_lat": d.start_lat, "start_lon": d.start_lon,
-        "end_label": d.end_label, "end_lat": d.end_lat, "end_lon": d.end_lon,
+        "id": d.id,
+        "name": d.name,
+        "kind": d.kind,
+        "color": d.color,
+        "start_label": d.start_label,
+        "start_lat": d.start_lat,
+        "start_lon": d.start_lon,
+        "end_label": d.end_label,
+        "end_lat": d.end_lat,
+        "end_lon": d.end_lon,
         "avoid_highways": d.avoid_highways,
         "start_time": d.start_time or "",
-        "max_stops": d.max_stops, "max_route_minutes": d.max_route_minutes,
-        "zip_codes": d.zip_codes or [], "locked": d.is_locked, "usual_stops": usual_count,
+        "max_stops": d.max_stops,
+        "max_route_minutes": d.max_route_minutes,
+        "zip_codes": d.zip_codes or [],
+        "locked": d.is_locked,
+        "usual_stops": usual_count,
     }
 
 
@@ -105,9 +115,7 @@ def update_driver(driver_id: int, body: DriverIn, db: Session = Depends(get_db))
     _fill_driver(d, body)
     if was_volunteer and not d.is_volunteer:
         # Staff have no usual stops.
-        db.query(KnownAddress).filter(KnownAddress.usual_driver_id == d.id).update(
-            {KnownAddress.usual_driver_id: None}
-        )
+        db.query(KnownAddress).filter(KnownAddress.usual_driver_id == d.id).update({KnownAddress.usual_driver_id: None})
     mark_plans_stale(db)
     db.commit()
     return driver_out(d, _usual_counts(db).get(d.id, 0))
@@ -117,9 +125,7 @@ def update_driver(driver_id: int, body: DriverIn, db: Session = Depends(get_db))
 def delete_driver(driver_id: int, db: Session = Depends(get_db)):
     d = db.get(Driver, driver_id) or bad("Driver not found", 404)
     # A removed volunteer's stops no longer have a usual driver.
-    db.query(KnownAddress).filter(KnownAddress.usual_driver_id == d.id).update(
-        {KnownAddress.usual_driver_id: None}
-    )
+    db.query(KnownAddress).filter(KnownAddress.usual_driver_id == d.id).update({KnownAddress.usual_driver_id: None})
     for plan in db.query(Plan).filter(Plan.day >= date.today()):
         plan.working_driver_ids = [i for i in (plan.working_driver_ids or []) if i != d.id]
         plan.stale = True

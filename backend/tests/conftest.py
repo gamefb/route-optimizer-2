@@ -43,11 +43,27 @@ def _write_grid(path: Path) -> None:
             writer.add_node(osmium.osm.mutable.Node(id=node_id(r, c), location=(lon, lat), version=1, visible=True))
     way = 1
     for r in range(GRID):
-        tags = {"highway": "motorway", "maxspeed": "110", "oneway": "no"} if r == 0 else {"highway": "residential", "name": f"Row {r} St"}
-        writer.add_way(osmium.osm.mutable.Way(id=way, nodes=[node_id(r, c) for c in range(GRID)], tags=tags, version=1, visible=True))
+        tags = (
+            {"highway": "motorway", "maxspeed": "110", "oneway": "no"}
+            if r == 0
+            else {"highway": "residential", "name": f"Row {r} St"}
+        )
+        writer.add_way(
+            osmium.osm.mutable.Way(
+                id=way, nodes=[node_id(r, c) for c in range(GRID)], tags=tags, version=1, visible=True
+            )
+        )
         way += 1
     for c in range(GRID):
-        writer.add_way(osmium.osm.mutable.Way(id=way, nodes=[node_id(r, c) for r in range(GRID)], tags={"highway": "residential", "name": f"Col {c} Ave"}, version=1, visible=True))
+        writer.add_way(
+            osmium.osm.mutable.Way(
+                id=way,
+                nodes=[node_id(r, c) for r in range(GRID)],
+                tags={"highway": "residential", "name": f"Col {c} Ave"},
+                version=1,
+                visible=True,
+            )
+        )
         way += 1
     writer.close()
 
@@ -74,9 +90,13 @@ def client(router, monkeypatch):
         except (ValueError, IndexError):
             return []
         if number >= 1000:  # far outside the grid
-            return [{"lat": 10.0, "lon": 10.0, "label": "Somewhere else", "confidence": "low", "note": "", "source": "test"}]
+            return [
+                {"lat": 10.0, "lon": 10.0, "label": "Somewhere else", "confidence": "low", "note": "", "source": "test"}
+            ]
         lat, lon = house_point(number)
-        return [{"lat": lat, "lon": lon, "label": f"{text} (found)", "confidence": "high", "note": "", "source": "test"}]
+        return [
+            {"lat": lat, "lon": lon, "label": f"{text} (found)", "confidence": "high", "note": "", "source": "test"}
+        ]
 
     monkeypatch.setattr(geo, "geocode", fake_geocode)
     with TestClient(app) as c:

@@ -1,5 +1,13 @@
 import type {
-  Address, Candidate, Driver, ImportJob, PendingAddress, Plan, RegionInfo, Settings, SettingsPatch,
+  Address,
+  Candidate,
+  Driver,
+  ImportJob,
+  PendingAddress,
+  Plan,
+  RegionInfo,
+  Settings,
+  SettingsPatch,
 } from "./types";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -63,8 +71,7 @@ export const api = {
   markNew: (id: number) => post<Plan>(`/stops/${id}/mark-new`),
   candidates: (id: number) =>
     get<{ candidates: Candidate[]; nearby_known: Address[]; error: string }>(`/stops/${id}/candidates`),
-  confirmLocation: (id: number, lat: number, lon: number) =>
-    post<Plan>(`/stops/${id}/confirm-location`, { lat, lon }),
+  confirmLocation: (id: number, lat: number, lon: number) => post<Plan>(`/stops/${id}/confirm-location`, { lat, lon }),
 
   compute: (id: number) => post<Plan>(`/plans/${id}/compute`),
   moveStop: (id: number, driverId: number | null) => post<Plan>(`/stops/${id}/move`, { driver_id: driverId }),

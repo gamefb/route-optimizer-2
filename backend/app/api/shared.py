@@ -98,14 +98,31 @@ def mark_plans_stale(db: Session) -> None:
 
 def address_out(a: KnownAddress) -> dict:
     return {
-        "id": a.id, "street": a.street, "unit": a.unit, "city": a.city, "state": a.state, "zip": a.zip,
-        "lat": a.lat, "lon": a.lon, "usual_driver_id": a.usual_driver_id, "notes": a.notes or "",
+        "id": a.id,
+        "street": a.street,
+        "unit": a.unit,
+        "city": a.city,
+        "state": a.state,
+        "zip": a.zip,
+        "lat": a.lat,
+        "lon": a.lon,
+        "usual_driver_id": a.usual_driver_id,
+        "notes": a.notes or "",
     }
 
 
 def pending_out(p: PendingAddress) -> dict:
-    return {"key": p.norm_key, "street": p.street, "unit": p.unit, "city": p.city, "state": p.state,
-            "zip": p.zip, "usual_driver_id": p.usual_driver_id, "notes": p.notes or "", "reason": p.reason or ""}
+    return {
+        "key": p.norm_key,
+        "street": p.street,
+        "unit": p.unit,
+        "city": p.city,
+        "state": p.state,
+        "zip": p.zip,
+        "usual_driver_id": p.usual_driver_id,
+        "notes": p.notes or "",
+        "reason": p.reason or "",
+    }
 
 
 def change_usual(db: Session, addr: KnownAddress, new_id: int | None) -> None:
@@ -124,15 +141,24 @@ def change_usual(db: Session, addr: KnownAddress, new_id: int | None) -> None:
     addr.usual_driver_id = new_id
 
 
-def save_address(db: Session, street: str, unit: str, city: str, state: str, zip_code: str,
-                 lat: float, lon: float) -> KnownAddress:
+def save_address(
+    db: Session, street: str, unit: str, city: str, state: str, zip_code: str, lat: float, lon: float
+) -> KnownAddress:
     """Save a confirmed location as a known address (or move an existing one)."""
     key = norm_key(street, unit, zip_code)
     addr = db.query(KnownAddress).filter(KnownAddress.norm_key == key).first()
     if addr is None:
         addr = KnownAddress(
-            street=street, unit=unit, city=city, state=state, zip=zip_code,
-            norm_key=key, building_key=building_key(street, zip_code), aliases=[], lat=lat, lon=lon,
+            street=street,
+            unit=unit,
+            city=city,
+            state=state,
+            zip=zip_code,
+            norm_key=key,
+            building_key=building_key(street, zip_code),
+            aliases=[],
+            lat=lat,
+            lon=lon,
         )
         db.add(addr)
         waiting = db.get(PendingAddress, key)
@@ -161,17 +187,32 @@ def stop_out(s: PlanStop, candidates: dict[int, KnownAddress]) -> dict:
     ids = (s.candidate_address_ids or []) if s.match_state == "possible" else []
     near = [address_out(candidates[i]) for i in ids if i in candidates]
     return {
-        "id": s.id, "seq": s.seq, "street": s.street, "unit": s.unit, "city": s.city,
-        "state": s.state, "zip": s.zip, "extras": s.extras or [],
-        "match_state": s.match_state, "problem": s.problem, "duplicate_of_seq": s.duplicate_of_seq,
-        "is_new_address": s.is_new_address, "address_id": s.address_id,
-        "lat": a.lat if a else None, "lon": a.lon if a else None,
+        "id": s.id,
+        "seq": s.seq,
+        "street": s.street,
+        "unit": s.unit,
+        "city": s.city,
+        "state": s.state,
+        "zip": s.zip,
+        "extras": s.extras or [],
+        "match_state": s.match_state,
+        "problem": s.problem,
+        "duplicate_of_seq": s.duplicate_of_seq,
+        "is_new_address": s.is_new_address,
+        "address_id": s.address_id,
+        "lat": a.lat if a else None,
+        "lon": a.lon if a else None,
         "usual_driver_id": a.usual_driver_id if a else None,
-        "notes": (a.notes or "") if a else "", "eta": s.eta,
+        "notes": (a.notes or "") if a else "",
+        "eta": s.eta,
         "candidates": near,
-        "manual_driver_id": s.manual_driver_id, "driver_id": s.driver_id, "label": s.label,
-        "covering_for_id": s.covering_for_id, "stop_number": s.stop_number,
-        "added_time_s": s.added_time_s, "added_distance_m": s.added_distance_m,
+        "manual_driver_id": s.manual_driver_id,
+        "driver_id": s.driver_id,
+        "label": s.label,
+        "covering_for_id": s.covering_for_id,
+        "stop_number": s.stop_number,
+        "added_time_s": s.added_time_s,
+        "added_distance_m": s.added_distance_m,
     }
 
 
@@ -179,9 +220,13 @@ def plan_out(db: Session, plan: Plan) -> dict:
     cand_ids = list({i for s in plan.stops for i in (s.candidate_address_ids or [])})
     candidates = {a.id: a for a in db.query(KnownAddress).filter(KnownAddress.id.in_(cand_ids))} if cand_ids else {}
     return {
-        "id": plan.id, "day": plan.day.isoformat(), "objective": plan.objective,
+        "id": plan.id,
+        "day": plan.day.isoformat(),
+        "objective": plan.objective,
         "working_driver_ids": plan.working_driver_ids or [],
-        "layout": plan.layout or [], "stale": plan.stale, "result": plan.result,
+        "layout": plan.layout or [],
+        "stale": plan.stale,
+        "result": plan.result,
         "start_time": plan.start_time or "09:00",
         "undo_label": (plan.undo or {}).get("label") or "",
         "sample": next((s.raw for s in plan.stops if s.raw), []),

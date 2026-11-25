@@ -23,17 +23,27 @@ function pinText(group: Stop[]): string {
  * and one numbered pin per spot. "each" can add to a stop pin (a title, a click).
  */
 export function routePins(
-  r: RouteResult, stops: Stop[], color: string,
+  r: RouteResult,
+  stops: Stop[],
+  color: string,
   options: { titles?: boolean; each?: (group: Stop[], text: string) => Partial<MapMarker> } = {},
 ): MapMarker[] {
   const title = (what: string) => (options.titles ? { title: `${r.name}: ${what}` } : {});
-  const pins: MapMarker[] = [{ lat: r.start[0], lon: r.start[1], color, shape: "square", text: "S", ...title("start") }];
+  const pins: MapMarker[] = [
+    { lat: r.start[0], lon: r.start[1], color, shape: "square", text: "S", ...title("start") },
+  ];
   if (r.end[0] !== r.start[0] || r.end[1] !== r.start[1]) {
     pins.push({ lat: r.end[0], lon: r.end[1], color, shape: "square", text: "E", ...title("end") });
   }
   for (const group of stopsBySpot(stops)) {
     const text = pinText(group);
-    pins.push({ lat: group[0].lat as number, lon: group[0].lon as number, color, text, ...options.each?.(group, text) });
+    pins.push({
+      lat: group[0].lat as number,
+      lon: group[0].lon as number,
+      color,
+      text,
+      ...options.each?.(group, text),
+    });
   }
   return pins;
 }

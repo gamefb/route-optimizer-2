@@ -85,12 +85,14 @@ class Router:
         cfg["mjolnir"]["concurrency"] = max(1, (os.cpu_count() or 2) - 1)
         # The defaults are sized for a public server. A day's plan needs a table
         # of every stop against every stop, and a route through all of a driver's stops.
-        cfg["service_limits"]["auto"].update({
-            "max_locations": 2000,
-            "max_matrix_location_pairs": 4_000_000,
-            "max_matrix_distance": 5_000_000.0,
-            "max_distance": 5_000_000.0,
-        })
+        cfg["service_limits"]["auto"].update(
+            {
+                "max_locations": 2000,
+                "max_matrix_location_pairs": 4_000_000,
+                "max_matrix_distance": 5_000_000.0,
+                "max_distance": 5_000_000.0,
+            }
+        )
         path = region_dir / "valhalla.json"
         path.write_text(json.dumps(cfg))
         return path
@@ -137,11 +139,14 @@ class Router:
             region_dir.mkdir(parents=True, exist_ok=True)
             pbf = region_dir / "map.osm.pbf"
             self._fetch(url, pbf)
-            self.pending.update(status="building", message="Building the road network. This can take a while for a large region.")
+            self.pending.update(
+                status="building", message="Building the road network. This can take a while for a large region."
+            )
             cfg = self._write_config(region_dir)
             proc = subprocess.run(
                 [sys.executable, "-m", "valhalla", "valhalla_build_tiles", "-c", str(cfg), str(pbf)],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             tiles = list((region_dir / "tiles").rglob("*.gph"))
             if proc.returncode != 0 or not tiles:
@@ -154,8 +159,12 @@ class Router:
                 self._actor = actor
                 self._tables.clear()  # they belong to the old map
             self.state = {
-                "status": "ready", "name": name, "url": url, "message": "",
-                "dir": str(region_dir), "built_at": time.strftime("%Y-%m-%d %H:%M"),
+                "status": "ready",
+                "name": name,
+                "url": url,
+                "message": "",
+                "dir": str(region_dir),
+                "built_at": time.strftime("%Y-%m-%d %H:%M"),
             }
             self._save_state()
             self.pending = None
@@ -198,7 +207,10 @@ class Router:
         key = (tuple(points), avoid_highways, shortest)
         locs = [{"lat": lat, "lon": lon} for lat, lon in points]
         req = {
-            "sources": locs, "targets": locs, "costing": "auto", "units": "kilometers",
+            "sources": locs,
+            "targets": locs,
+            "costing": "auto",
+            "units": "kilometers",
             "costing_options": self._costing_options(avoid_highways, shortest),
         }
         try:
@@ -234,7 +246,8 @@ class Router:
             return []
         req = {
             "locations": [{"lat": lat, "lon": lon} for lat, lon in cleaned],
-            "costing": "auto", "directions_type": "none",
+            "costing": "auto",
+            "directions_type": "none",
             "costing_options": self._costing_options(avoid_highways, shortest),
         }
         try:

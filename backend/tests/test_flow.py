@@ -5,8 +5,44 @@ import io
 
 from .conftest import grid_point, zip_for
 
-HOUSES = [11, 12, 13, 14, 21, 22, 23, 24, 31, 33, 41, 43, 15, 16, 17, 18, 25, 27, 36, 38, 46, 48, 56, 58,
-          61, 62, 71, 73, 82, 84, 66, 67, 76, 78, 86, 88]
+HOUSES = [
+    11,
+    12,
+    13,
+    14,
+    21,
+    22,
+    23,
+    24,
+    31,
+    33,
+    41,
+    43,
+    15,
+    16,
+    17,
+    18,
+    25,
+    27,
+    36,
+    38,
+    46,
+    48,
+    56,
+    58,
+    61,
+    62,
+    71,
+    73,
+    82,
+    84,
+    66,
+    67,
+    76,
+    78,
+    86,
+    88,
+]
 
 
 def paste_text(houses=HOUSES, unit=""):
@@ -15,8 +51,17 @@ def paste_text(houses=HOUSES, unit=""):
 
 def make_driver(client, name, kind="staff", at=(0, 0), **extra):
     lat, lon = grid_point(*at)
-    body = {"name": name, "kind": kind, "start_label": "base", "start_lat": lat, "start_lon": lon,
-            "end_label": "base", "end_lat": lat, "end_lon": lon, **extra}
+    body = {
+        "name": name,
+        "kind": kind,
+        "start_label": "base",
+        "start_lat": lat,
+        "start_lon": lon,
+        "end_label": "base",
+        "end_lat": lat,
+        "end_lon": lon,
+        **extra,
+    }
     r = client.post("/api/drivers", json=body)
     assert r.status_code == 200, r.text
     return r.json()
@@ -75,7 +120,10 @@ def test_possible_match_and_alias(client):
     staff = make_driver(client, "Alex")
     day(client, "2026-01-05", [staff], houses=[11, 12])
     plan = client.get("/api/plans/by-day/2026-01-06").json()
-    plan = client.post(f"/api/plans/{plan['id']}/paste", json={"text": "11 Grid Street\t\tGridville\tOH\t43001\n12 Gridd St\t\tGridville\tOH\t43001\n"}).json()
+    plan = client.post(
+        f"/api/plans/{plan['id']}/paste",
+        json={"text": "11 Grid Street\t\tGridville\tOH\t43001\n12 Gridd St\t\tGridville\tOH\t43001\n"},
+    ).json()
     states = [s["match_state"] for s in plan["stops"]]
     assert states == ["matched", "possible"]  # "Street" tidies to "St"; "Gridd" is a near miss
     assert [c["street"] for c in plan["stops"][1]["candidates"]] == ["12 Grid St"]
@@ -83,7 +131,9 @@ def test_possible_match_and_alias(client):
     assert plan["stops"][1]["match_state"] == "matched"
     # the spelling is remembered
     plan3 = client.get("/api/plans/by-day/2026-01-07").json()
-    plan3 = client.post(f"/api/plans/{plan3['id']}/paste", json={"text": "12 Gridd St\t\tGridville\tOH\t43001\n"}).json()
+    plan3 = client.post(
+        f"/api/plans/{plan3['id']}/paste", json={"text": "12 Gridd St\t\tGridville\tOH\t43001\n"}
+    ).json()
     assert plan3["stops"][0]["match_state"] == "matched"
 
 
@@ -174,7 +224,12 @@ def test_make_usual_then_pinned_and_lock(client):
     other = next(s for s in plan2["stops"] if s["driver_id"] == alex["id"])
     assert client.post(f"/api/stops/{other['id']}/move", json={"driver_id": vera["id"]}).status_code == 400
     assert client.post(f"/api/stops/{hers[0]['id']}/move", json={"driver_id": alex["id"]}).status_code == 400
-    assert client.put(f"/api/addresses/{hers[0]['address_id']}", json={"set_usual": True, "usual_driver_id": None}).status_code == 400
+    assert (
+        client.put(
+            f"/api/addresses/{hers[0]['address_id']}", json={"set_usual": True, "usual_driver_id": None}
+        ).status_code
+        == 400
+    )
 
 
 def test_volunteer_off_is_covered_temporarily(client):
@@ -187,7 +242,10 @@ def test_volunteer_off_is_covered_temporarily(client):
 
     plan2 = compute(client, day(client, "2026-01-06", [alex]))  # Vera is off
     covered = [s for s in plan2["stops"] if s["address_id"] in usual_ids]
-    assert all(s["driver_id"] == alex["id"] and s["label"] == "covering" and s["covering_for_id"] == vera["id"] for s in covered)
+    assert all(
+        s["driver_id"] == alex["id"] and s["label"] == "covering" and s["covering_for_id"] == vera["id"]
+        for s in covered
+    )
     # still hers afterwards
     assert len(client.get(f"/api/addresses?driver_id={vera['id']}").json()) == 4
 
@@ -223,7 +281,18 @@ def test_manual_move_and_csv(client):
     assert moved["driver_id"] == alex["id"] and moved["label"] == "manual"
 
     rows = list(csv.reader(io.StringIO(client.get(f"/api/plans/{plan['id']}/export.csv").text)))
-    assert rows[0] == ["List Order", "Street", "Unit", "City", "State", "Zip", "Driver", "Stop Number", "Estimated Arrival", "Notes"]
+    assert rows[0] == [
+        "List Order",
+        "Street",
+        "Unit",
+        "City",
+        "State",
+        "Zip",
+        "Driver",
+        "Stop Number",
+        "Estimated Arrival",
+        "Notes",
+    ]
     assert [r[1] for r in rows[1:]] == [f"{n} Grid St" for n in HOUSES]  # list order
     assert [int(r[0]) for r in rows[1:]] == list(range(1, len(HOUSES) + 1))  # numbered across the whole paste
     assert all(r[6] in ("Alex", "Blair") and int(r[7]) >= 1 and len(r[8]) == 5 for r in rows[1:])

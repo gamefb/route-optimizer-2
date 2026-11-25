@@ -269,10 +269,16 @@ def stop_candidates(stop_id: int, db: Session = Depends(get_db)):
     out, error = [], ""
     building = same_building(book, stop.street, stop.zip)
     if building is not None:
-        out.append({
-            "lat": building.lat, "lon": building.lon, "confidence": "high", "source": "known", "note": "",
-            "label": f"Same building as {building.street} {building.unit}".strip() + " (already confirmed)",
-        })
+        out.append(
+            {
+                "lat": building.lat,
+                "lon": building.lon,
+                "confidence": "high",
+                "source": "known",
+                "note": "",
+                "label": f"Same building as {building.street} {building.unit}".strip() + " (already confirmed)",
+            }
+        )
     try:
         out += lookup(db, street=stop.street, city=stop.city, state=stop.state, zip_code=stop.zip)
     except geo.GeocodeError as exc:

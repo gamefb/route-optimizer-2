@@ -31,7 +31,16 @@ def fake_geocode(provider, street="", city="", state="", zip_code="", freeform=N
     if number > 99:
         return []
     lat, lon = conftest.house_point(number)
-    return [{"lat": lat, "lon": lon, "label": f"{text.upper()}, GRIDVILLE, OH", "confidence": "high", "note": "", "source": "demo"}]
+    return [
+        {
+            "lat": lat,
+            "lon": lon,
+            "label": f"{text.upper()}, GRIDVILLE, OH",
+            "confidence": "high",
+            "note": "",
+            "source": "demo",
+        }
+    ]
 
 
 def main() -> None:

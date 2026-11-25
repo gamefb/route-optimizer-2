@@ -34,8 +34,11 @@ def _run(db: Session, plan: Plan) -> dict:
     try:
         settings = get_settings(db)
         return planner.compute(
-            db, plan, get_router(),
-            staff_balance=settings["staff_balance"], minutes_per_stop=int(settings["minutes_per_stop"] or 0),
+            db,
+            plan,
+            get_router(),
+            staff_balance=settings["staff_balance"],
+            minutes_per_stop=int(settings["minutes_per_stop"] or 0),
         )
     except (planner.PlanError, RoutingError) as exc:
         bad(str(exc), 422)
@@ -104,7 +107,12 @@ def move_stop(stop_id: int, body: MoveIn, db: Session = Depends(get_db)):
     stop = get_stop(db, stop_id)
     plan = stop.plan
     usual = db.get(Driver, stop.address.usual_driver_id) if stop.address and stop.address.usual_driver_id else None
-    if usual is not None and usual.is_locked and usual.id in (plan.working_driver_ids or []) and body.driver_id != usual.id:
+    if (
+        usual is not None
+        and usual.is_locked
+        and usual.id in (plan.working_driver_ids or [])
+        and body.driver_id != usual.id
+    ):
         bad(locked_message(usual, "move this stop"))
     if body.driver_id is not None:
         target = db.get(Driver, body.driver_id) or bad("Driver not found", 404)
@@ -231,11 +239,17 @@ def export_csv(plan_id: int, db: Session = Depends(get_db)):
     for s in sorted(plan.stops, key=lambda x: x.seq):
         extras = list(s.extras or []) + [""] * (extra_width - len(s.extras or []))
         writer.writerow(
-            [s.seq, s.street, s.unit, s.city, s.state, s.zip] + extras
-            + [names.get(s.driver_id, "") if s.driver_id else "", s.stop_number or "",
-               s.eta or "", (s.address.notes or "") if s.address else ""]
+            [s.seq, s.street, s.unit, s.city, s.state, s.zip]
+            + extras
+            + [
+                names.get(s.driver_id, "") if s.driver_id else "",
+                s.stop_number or "",
+                s.eta or "",
+                (s.address.notes or "") if s.address else "",
+            ]
         )
     return Response(
-        content=buf.getvalue(), media_type="text/csv",
+        content=buf.getvalue(),
+        media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="routes-{plan.day.isoformat()}.csv"'},
     )

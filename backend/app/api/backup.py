@@ -21,11 +21,38 @@ from .shared import bad, pending_out
 router = APIRouter()
 
 
-DRIVER_FIELDS = ["name", "kind", "color", "start_time", "start_label", "start_lat", "start_lon", "end_label", "end_lat",
-                 "end_lon", "avoid_highways", "max_stops", "max_route_minutes", "zip_codes", "locked"]
+DRIVER_FIELDS = [
+    "name",
+    "kind",
+    "color",
+    "start_time",
+    "start_label",
+    "start_lat",
+    "start_lon",
+    "end_label",
+    "end_lat",
+    "end_lon",
+    "avoid_highways",
+    "max_stops",
+    "max_route_minutes",
+    "zip_codes",
+    "locked",
+]
 
 
-ADDRESS_FIELDS = ["street", "unit", "city", "state", "zip", "norm_key", "building_key", "aliases", "lat", "lon", "notes"]
+ADDRESS_FIELDS = [
+    "street",
+    "unit",
+    "city",
+    "state",
+    "zip",
+    "norm_key",
+    "building_key",
+    "aliases",
+    "lat",
+    "lon",
+    "notes",
+]
 
 
 BACKUP_DIR = os.environ.get("BACKUP_DIR", "").strip()
@@ -36,7 +63,9 @@ BACKUP_KEEP = int(os.environ.get("BACKUP_KEEP", "30") or 30)
 
 def backup_data(db: Session) -> dict:
     return {
-        "app": "route-planner", "version": 2, "exported_at": datetime.now().isoformat(timespec="seconds"),
+        "app": "route-planner",
+        "version": 2,
+        "exported_at": datetime.now().isoformat(timespec="seconds"),
         "settings": {row.key: row.value for row in db.query(Setting).all()},
         "drivers": [{"id": d.id, **{f: getattr(d, f) for f in DRIVER_FIELDS}} for d in db.query(Driver).all()],
         "addresses": [
@@ -88,8 +117,11 @@ def backup_files():
     if not BACKUP_DIR:
         return {"enabled": False, "files": [], "keep": BACKUP_KEEP}
     files = sorted(Path(BACKUP_DIR).glob("route-planner-backup-*.json"), reverse=True)
-    return {"enabled": True, "keep": BACKUP_KEEP,
-            "files": [{"name": f.name, "bytes": f.stat().st_size} for f in files[:60]]}
+    return {
+        "enabled": True,
+        "keep": BACKUP_KEEP,
+        "files": [{"name": f.name, "bytes": f.stat().st_size} for f in files[:60]],
+    }
 
 
 @router.post("/api/backup/save")
@@ -104,7 +136,8 @@ def backup_save_now():
 def backup(db: Session = Depends(get_db)):
     """Everything that would be painful to re-enter: drivers, addresses, usual stops, notes, settings."""
     return Response(
-        content=json.dumps(backup_data(db), indent=1), media_type="application/json",
+        content=json.dumps(backup_data(db), indent=1),
+        media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="route-planner-backup-{date.today().isoformat()}.json"'},
     )
 
@@ -112,8 +145,11 @@ def backup(db: Session = Depends(get_db)):
 @router.post("/api/restore")
 def restore(data: dict, db: Session = Depends(get_db)):
     """Replace drivers, addresses and settings with a backup file. Day plans are cleared."""
-    if data.get("app") != "route-planner" or not isinstance(data.get("drivers"), list) \
-            or not isinstance(data.get("addresses"), list):
+    if (
+        data.get("app") != "route-planner"
+        or not isinstance(data.get("drivers"), list)
+        or not isinstance(data.get("addresses"), list)
+    ):
         bad("That file is not a Route Planner backup.")
     try:
         db.query(PlanStop).delete()
@@ -136,12 +172,19 @@ def restore(data: dict, db: Session = Depends(get_db)):
             a.usual_driver_id = new_id.get(item.get("usual_driver_id"))
             db.add(a)
         for item in data.get("pending") or []:
-            db.add(PendingAddress(
-                norm_key=item["key"], street=item.get("street", ""), unit=item.get("unit", ""),
-                city=item.get("city", ""), state=item.get("state", ""), zip=item.get("zip", ""),
-                usual_driver_id=new_id.get(item.get("usual_driver_id")), notes=item.get("notes"),
-                reason=item.get("reason"),
-            ))
+            db.add(
+                PendingAddress(
+                    norm_key=item["key"],
+                    street=item.get("street", ""),
+                    unit=item.get("unit", ""),
+                    city=item.get("city", ""),
+                    state=item.get("state", ""),
+                    zip=item.get("zip", ""),
+                    usual_driver_id=new_id.get(item.get("usual_driver_id")),
+                    notes=item.get("notes"),
+                    reason=item.get("reason"),
+                )
+            )
         for key, value in (data.get("settings") or {}).items():
             db.add(Setting(key=str(key), value=value))
         db.commit()

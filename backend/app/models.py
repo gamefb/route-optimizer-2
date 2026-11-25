@@ -57,9 +57,7 @@ class KnownAddress(Base):
     aliases: Mapped[list] = mapped_column(JSON, default=list)
     lat: Mapped[float] = mapped_column(Float)
     lon: Mapped[float] = mapped_column(Float)
-    usual_driver_id: Mapped[int | None] = mapped_column(
-        ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True
-    )
+    usual_driver_id: Mapped[int | None] = mapped_column(ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)  # gate codes, "leave at side door"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now())
 
@@ -98,9 +96,7 @@ class PlanStop(Base):
     extras: Mapped[list] = mapped_column(JSON, default=list)
     # matched | possible | new | invalid
     match_state: Mapped[str] = mapped_column(String(12), default="new")
-    address_id: Mapped[int | None] = mapped_column(
-        ForeignKey("addresses.id", ondelete="SET NULL"), nullable=True
-    )
+    address_id: Mapped[int | None] = mapped_column(ForeignKey("addresses.id", ondelete="SET NULL"), nullable=True)
     candidate_address_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)  # every near match, closest first
     is_new_address: Mapped[bool] = mapped_column(Boolean, default=False)
     duplicate_of_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)

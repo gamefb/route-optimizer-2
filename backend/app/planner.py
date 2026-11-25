@@ -333,7 +333,9 @@ def _route(
         driven += durations[before][here]
         label, usual_volunteer = tag(stop_id, d)
         assignments[str(stop_id)] = {
-            "driver_id": d.id, "label": label, "stop_number": n,
+            "driver_id": d.id,
+            "label": label,
+            "stop_number": n,
             "covering_for_id": usual_volunteer,
             "eta": clock(start_time, driven + service_s * (n - 1)),
             "added_time_s": insertion_delta(durations, before, here, after),
@@ -344,18 +346,30 @@ def _route(
     if stop_ids:
         shapes = day.router.route_shapes([day.points[i] for i in chain], d.avoid_highways, day.objective == "distance")
     route = {
-        "driver_id": d.id, "name": d.name, "kind": d.kind, "color": d.color,
-        "locked": d.is_locked, "avoid_highways": d.avoid_highways, "order_mode": mode,
-        "stop_ids": stop_ids, "stops": len(stop_ids), "time_s": time_s,
+        "driver_id": d.id,
+        "name": d.name,
+        "kind": d.kind,
+        "color": d.color,
+        "locked": d.is_locked,
+        "avoid_highways": d.avoid_highways,
+        "order_mode": mode,
+        "stop_ids": stop_ids,
+        "stops": len(stop_ids),
+        "time_s": time_s,
         "distance_m": day.trip(distances, d, stop_ids) if stop_ids else 0,
-        "over_limit": _over_limit(day, d, stop_ids, time_s), "shapes": shapes,
+        "over_limit": _over_limit(day, d, stop_ids, time_s),
+        "shapes": shapes,
         "start_time": start_time,
         "finish_time": clock(start_time, time_s + service_s * len(stop_ids)) if stop_ids else start_time,
-        "start": [d.start_lat, d.start_lon], "end": [d.end_lat, d.end_lon],
+        "start": [d.start_lat, d.start_lon],
+        "end": [d.end_lat, d.end_lon],
         "limits": {
-            "max_stops": d.max_stops, "max_route_minutes": d.max_route_minutes,
+            "max_stops": d.max_stops,
+            "max_route_minutes": d.max_route_minutes,
             "zip_codes": d.zip_codes or [],
-        } if d.is_volunteer else None,
+        }
+        if d.is_volunteer
+        else None,
     }
     return route, assignments
 
@@ -376,7 +390,11 @@ def _service_seconds(minutes_per_stop: int) -> int:
 
 
 def compute(
-    db: Session, plan: Plan, router: Router, staff_balance: str = "stops", minutes_per_stop: int = 0,
+    db: Session,
+    plan: Plan,
+    router: Router,
+    staff_balance: str = "stops",
+    minutes_per_stop: int = 0,
 ) -> dict:
     """Work out the plan and return it. Nothing is saved; see apply_result.
 

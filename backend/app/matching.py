@@ -52,9 +52,7 @@ def match_stop(stop: PlanStop, book: AddressBook) -> None:
     stop.address = None
     stop.candidate_address_ids = None
     stop.is_new_address = False
-    stop.problem = row_problem(
-        {"street": stop.street, "zip": stop.zip, "state": stop.state}
-    )
+    stop.problem = row_problem({"street": stop.street, "zip": stop.zip, "state": stop.state})
     if stop.problem:
         stop.match_state = "invalid"
         return

@@ -104,7 +104,9 @@ def _run_import(rows: list[list[str]], layout: list[str], auto_save: bool) -> No
                 continue
             owner = volunteers.get(f["volunteer"].lower()) if f["volunteer"] else None
             if f["volunteer"] and owner is None:
-                job["problems"].append(f"Row {n}: no volunteer named \"{f['volunteer']}\". Saved without a usual volunteer.")
+                job["problems"].append(
+                    f'Row {n}: no volunteer named "{f["volunteer"]}". Saved without a usual volunteer.'
+                )
             if owner is not None and owner.is_locked:
                 job["problems"].append(f"Row {n}: {owner.name} is locked. Saved without a usual volunteer.")
                 owner = None
@@ -157,8 +159,9 @@ def import_start(body: ImportIn, db: Session = Depends(get_db)):
         if _import_job.get("status") == "running":
             bad("An import is already running.", 409)
         _import_job.clear()
-        _import_job.update(status="running", total=len(rows), done=0, saved=0, updated=0, pending=0,
-                           problems=[], message="")
+        _import_job.update(
+            status="running", total=len(rows), done=0, saved=0, updated=0, pending=0, problems=[], message=""
+        )
     threading.Thread(target=_run_import, args=(rows, layout, body.auto_save), daemon=True).start()
     return dict(_import_job)
 

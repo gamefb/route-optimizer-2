@@ -122,7 +122,9 @@ def test_bulk_import_saves_confident_addresses_and_parks_the_rest(client):
     assert len(pending) == 1 and pending[0]["street"] == "5000 Far Rd" and pending[0]["reason"]
 
     # Importing again updates rather than duplicates.
-    client.post("/api/import/addresses", json={"text": row("13 Grid St", "", "Gridville", "OH", "43001", "Vera", "Ring bell")})
+    client.post(
+        "/api/import/addresses", json={"text": row("13 Grid St", "", "Gridville", "OH", "43001", "Vera", "Ring bell")}
+    )
     job = wait_for_import(client)
     assert (job["saved"], job["updated"]) == (0, 1)
     assert len(client.get("/api/addresses").json()) == 3
@@ -142,7 +144,9 @@ def test_bulk_import_saves_confident_addresses_and_parks_the_rest(client):
 
 def test_import_without_auto_save_parks_everything(client):
     make_driver(client, "Vera", "volunteer", at=(2, 2))
-    client.post("/api/import/addresses", json={"text": row("11 Grid St", "", "Gridville", "OH", "43001"), "auto_save": False})
+    client.post(
+        "/api/import/addresses", json={"text": row("11 Grid St", "", "Gridville", "OH", "43001"), "auto_save": False}
+    )
     job = wait_for_import(client)
     assert (job["saved"], job["pending"]) == (0, 1)
 
@@ -195,7 +199,9 @@ def test_older_database_loses_retired_columns(client):
     alex = make_driver(client, "Alex", at=(0, 0))
     day(client, "2026-01-05", [alex], houses=[12])
     plan = client.get("/api/plans/by-day/2026-01-06").json()
-    plan = client.post(f"/api/plans/{plan['id']}/paste", json={"text": paste_text([12]).replace("Grid", "Gridd")}).json()
+    plan = client.post(
+        f"/api/plans/{plan['id']}/paste", json={"text": paste_text([12]).replace("Grid", "Gridd")}
+    ).json()
     stop = plan["stops"][0]
     assert stop["match_state"] == "possible"
     known = stop["candidates"][0]["id"]
@@ -203,10 +209,14 @@ def test_older_database_loses_retired_columns(client):
         conn.execute(text("ALTER TABLE drivers ADD COLUMN default_working BOOLEAN NOT NULL DEFAULT 1"))
         conn.execute(text("ALTER TABLE plans ADD COLUMN order_modes JSON NOT NULL DEFAULT '{}'"))
         conn.execute(text("ALTER TABLE plan_stops ADD COLUMN candidate_address_id INTEGER"))
-        conn.execute(text("UPDATE plan_stops SET candidate_address_id = :known, candidate_address_ids = NULL WHERE id = :id"),
-                     {"known": known, "id": stop["id"]})
+        conn.execute(
+            text("UPDATE plan_stops SET candidate_address_id = :known, candidate_address_ids = NULL WHERE id = :id"),
+            {"known": known, "id": stop["id"]},
+        )
     ensure_schema()
-    columns = {table: {c["name"] for c in inspect(engine).get_columns(table)} for table in ("drivers", "plans", "plan_stops")}
+    columns = {
+        table: {c["name"] for c in inspect(engine).get_columns(table)} for table in ("drivers", "plans", "plan_stops")
+    }
     assert "default_working" not in columns["drivers"]
     assert "order_modes" not in columns["plans"]
     assert "candidate_address_id" not in columns["plan_stops"]
@@ -256,14 +266,14 @@ def test_drag_order_driver_start_time_and_backup_folder(client, tmp_path, monkey
 
 def test_volunteer_without_limits_shares_like_staff(client):
     alex = make_driver(client, "Alex", at=(0, 0))
-    free = make_driver(client, "Fran", "volunteer", at=(9, 9))          # no limits at all
+    free = make_driver(client, "Fran", "volunteer", at=(9, 9))  # no limits at all
     capped = make_driver(client, "Vera", "volunteer", at=(2, 2), max_stops=4)
     plan = compute(client, day(client, "2026-01-05", [alex, free, capped]))
     counts = {r["driver_id"]: r["stops"] for r in plan["result"]["routes"]}
-    assert counts[capped["id"]] == 4                                    # limited volunteer still filled first
+    assert counts[capped["id"]] == 4  # limited volunteer still filled first
     rest = 36 - 4
     assert counts[alex["id"]] + counts[free["id"]] == rest
-    assert max(counts[alex["id"]], counts[free["id"]]) <= 20            # shared roughly evenly (16 each, up to 20%)
+    assert max(counts[alex["id"]], counts[free["id"]]) <= 20  # shared roughly evenly (16 each, up to 20%)
     assert min(counts[alex["id"]], counts[free["id"]]) >= 12
 
     # Her usual stops still come to her first, and count toward her share.
@@ -271,14 +281,20 @@ def test_volunteer_without_limits_shares_like_staff(client):
     usual = {a["id"] for a in client.get(f"/api/addresses?driver_id={free['id']}").json()}
     plan = compute(client, plan)
     hers = [s for s in plan["stops"] if s["driver_id"] == free["id"]]
-    assert usual <= {s["address_id"] for s in hers} and all(s["label"] == "usual" for s in hers if s["address_id"] in usual)
+    assert usual <= {s["address_id"] for s in hers} and all(
+        s["label"] == "usual" for s in hers if s["address_id"] in usual
+    )
     assert not plan["result"]["unassigned"]
 
 
 def test_several_near_matches_are_all_offered(client):
     make_driver(client, "Alex", at=(0, 0))
     plan = client.get("/api/plans/by-day/2026-01-05").json()
-    known = row("12 Grid St", "", "Gridville", "OH", "43001") + row("12 Grid Ct", "", "Gridville", "OH", "43001") + row("12 Gridd St", "", "Gridville", "OH", "43001")
+    known = (
+        row("12 Grid St", "", "Gridville", "OH", "43001")
+        + row("12 Grid Ct", "", "Gridville", "OH", "43001")
+        + row("12 Gridd St", "", "Gridville", "OH", "43001")
+    )
     plan = client.post(f"/api/plans/{plan['id']}/paste", json={"text": known}).json()
     while any(s["match_state"] != "matched" for s in plan["stops"]):
         s = next(s for s in plan["stops"] if s["match_state"] != "matched")
@@ -290,7 +306,9 @@ def test_several_near_matches_are_all_offered(client):
     assert len(client.get("/api/addresses").json()) == 3
 
     plan2 = client.get("/api/plans/by-day/2026-01-06").json()
-    plan2 = client.post(f"/api/plans/{plan2['id']}/paste", json={"text": row("12 Gridd Ct", "", "Gridville", "OH", "43001")}).json()
+    plan2 = client.post(
+        f"/api/plans/{plan2['id']}/paste", json={"text": row("12 Gridd Ct", "", "Gridville", "OH", "43001")}
+    ).json()
     stop = plan2["stops"][0]
     assert stop["match_state"] == "possible"
     offered = [c["street"] for c in stop["candidates"]]

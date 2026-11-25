@@ -12,7 +12,7 @@ export function errorText(e: unknown): string {
 export function useAction() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const run = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+  const run = useCallback(async <T>(fn: () => Promise<T>): Promise<T | null> => {
     setBusy(true);
     setError("");
     try {

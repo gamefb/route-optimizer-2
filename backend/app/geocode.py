@@ -41,9 +41,7 @@ def distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def _get(url: str, params: dict) -> dict | list:
     try:
-        resp = httpx.get(
-            url, params=params, headers={"User-Agent": USER_AGENT}, timeout=20, follow_redirects=True
-        )
+        resp = httpx.get(url, params=params, headers={"User-Agent": USER_AGENT}, timeout=20, follow_redirects=True)
         resp.raise_for_status()
         return resp.json()
     except httpx.HTTPStatusError as exc:
@@ -63,8 +61,12 @@ def _census(street: str, city: str, state: str, zip_code: str, freeform: str | N
         data = _get(
             f"{CENSUS_URL}/address",
             {
-                "street": street, "city": city, "state": state, "zip": zip_code[:5],
-                "benchmark": "Public_AR_Current", "format": "json",
+                "street": street,
+                "city": city,
+                "state": state,
+                "zip": zip_code[:5],
+                "benchmark": "Public_AR_Current",
+                "format": "json",
             },
         )
     out = []
@@ -74,13 +76,16 @@ def _census(street: str, city: str, state: str, zip_code: str, freeform: str | N
             continue
         found_zip = (match.get("addressComponents") or {}).get("zip", "")
         low = bool(zip_code) and bool(found_zip) and found_zip[:5] != zip_code[:5]
-        out.append({
-            "lat": float(coords["y"]), "lon": float(coords["x"]),
-            "label": match.get("matchedAddress", ""),
-            "confidence": "low" if low else "high",
-            "note": "Found in a different zip code" if low else "",
-            "source": "census",
-        })
+        out.append(
+            {
+                "lat": float(coords["y"]),
+                "lon": float(coords["x"]),
+                "label": match.get("matchedAddress", ""),
+                "confidence": "low" if low else "high",
+                "note": "Found in a different zip code" if low else "",
+                "source": "census",
+            }
+        )
     return out
 
 
@@ -111,12 +116,16 @@ def _nominatim(street: str, city: str, state: str, zip_code: str, freeform: str 
             note = f"Only the {kind or 'area'} was found, not the building"
         elif zip_code and found_zip and found_zip[:5] != zip_code[:5]:
             note, precise = "Found in a different zip code", False
-        out.append({
-            "lat": float(item["lat"]), "lon": float(item["lon"]),
-            "label": item.get("display_name", ""),
-            "confidence": "high" if precise else "low",
-            "note": note, "source": "nominatim",
-        })
+        out.append(
+            {
+                "lat": float(item["lat"]),
+                "lon": float(item["lon"]),
+                "label": item.get("display_name", ""),
+                "confidence": "high" if precise else "low",
+                "note": note,
+                "source": "nominatim",
+            }
+        )
     return out
 
 
@@ -141,20 +150,29 @@ def _google(street, city, state, zip_code, freeform, key: str) -> list[dict]:
             continue
         kind = (r.get("geometry") or {}).get("location_type", "")
         precise = kind in ("ROOFTOP", "RANGE_INTERPOLATED") and not r.get("partial_match")
-        out.append({
-            "lat": float(loc["lat"]), "lon": float(loc["lng"]), "label": r.get("formatted_address", ""),
-            "confidence": "high" if precise else "low",
-            "note": "" if precise else "Only an approximate or partial match was found",
-            "source": "google",
-        })
+        out.append(
+            {
+                "lat": float(loc["lat"]),
+                "lon": float(loc["lng"]),
+                "label": r.get("formatted_address", ""),
+                "confidence": "high" if precise else "low",
+                "note": "" if precise else "Only an approximate or partial match was found",
+                "source": "google",
+            }
+        )
     return out
 
 
 def _mapbox(street, city, state, zip_code, freeform, key: str) -> list[dict]:
     data = _get(
         "https://api.mapbox.com/search/geocode/v6/forward",
-        {"q": _line(street, city, state, zip_code, freeform), "country": "us", "types": "address",
-         "limit": 5, "access_token": key},
+        {
+            "q": _line(street, city, state, zip_code, freeform),
+            "country": "us",
+            "types": "address",
+            "limit": 5,
+            "access_token": key,
+        },
     )
     out = []
     for f in data.get("features") or []:
@@ -164,13 +182,16 @@ def _mapbox(street, city, state, zip_code, freeform, key: str) -> list[dict]:
         props = f.get("properties") or {}
         confidence = (props.get("match_code") or {}).get("confidence", "")
         precise = confidence in ("exact", "high")
-        out.append({
-            "lat": float(coords[1]), "lon": float(coords[0]),
-            "label": props.get("full_address") or props.get("name", ""),
-            "confidence": "high" if precise else "low",
-            "note": "" if precise else f"Match confidence is {confidence or 'unknown'}",
-            "source": "mapbox",
-        })
+        out.append(
+            {
+                "lat": float(coords[1]),
+                "lon": float(coords[0]),
+                "label": props.get("full_address") or props.get("name", ""),
+                "confidence": "high" if precise else "low",
+                "note": "" if precise else f"Match confidence is {confidence or 'unknown'}",
+                "source": "mapbox",
+            }
+        )
     return out
 
 
@@ -188,12 +209,16 @@ def _geocodio(street, city, state, zip_code, freeform, key: str) -> list[dict]:
             continue
         kind = r.get("accuracy_type", "")
         precise = kind in ("rooftop", "point", "range_interpolation", "nearest_rooftop_match")
-        out.append({
-            "lat": float(loc["lat"]), "lon": float(loc["lng"]), "label": r.get("formatted_address", ""),
-            "confidence": "high" if precise else "low",
-            "note": "" if precise else f"Only the {kind.replace('_', ' ') or 'area'} was found",
-            "source": "geocodio",
-        })
+        out.append(
+            {
+                "lat": float(loc["lat"]),
+                "lon": float(loc["lng"]),
+                "label": r.get("formatted_address", ""),
+                "confidence": "high" if precise else "low",
+                "note": "" if precise else f"Only the {kind.replace('_', ' ') or 'area'} was found",
+                "source": "geocodio",
+            }
+        )
     return out
 
 
@@ -208,8 +233,13 @@ def env_key(provider: str) -> str:
 
 
 def geocode(
-    provider: str, street: str = "", city: str = "", state: str = "", zip_code: str = "",
-    freeform: str | None = None, keys: dict | None = None,
+    provider: str,
+    street: str = "",
+    city: str = "",
+    state: str = "",
+    zip_code: str = "",
+    freeform: str | None = None,
+    keys: dict | None = None,
 ) -> list[dict]:
     """Return candidate locations, best first.
 

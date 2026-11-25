@@ -24,12 +24,25 @@ export function usageText(r: RouteResult): string {
   if (!r.limits) return "";
   const parts = [];
   if (r.limits.max_stops) parts.push(`${r.stops} of ${r.limits.max_stops} stops`);
-  if (r.limits.max_route_minutes) parts.push(`${formatDuration(r.time_s)} of ${formatDuration(r.limits.max_route_minutes * 60)} driving`);
+  if (r.limits.max_route_minutes)
+    parts.push(`${formatDuration(r.time_s)} of ${formatDuration(r.limits.max_route_minutes * 60)} driving`);
   if (r.limits.zip_codes.length) parts.push(`zips ${r.limits.zip_codes.join(", ")}`);
   return parts.join(" · ");
 }
 
-export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUsual, onMakeAllUsual, onReorder, onResetOrder, onSetOrder, onNotes }: Props) {
+export default function Routes({
+  plan,
+  drivers,
+  settings,
+  busy,
+  onMove,
+  onMakeUsual,
+  onMakeAllUsual,
+  onReorder,
+  onResetOrder,
+  onSetOrder,
+  onNotes,
+}: Props) {
   const result = plan.result!;
   const [focus, setFocus] = useState<number | null>(null);
   const [picked, setPicked] = useState<{ id: number; from: "list" | "map"; n: number } | null>(null);
@@ -39,7 +52,8 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
   // Clicking a pin scrolls to its stop in the list; clicking a stop brings the map to its pin.
   useEffect(() => {
     if (!picked) return;
-    if (picked.from === "map") document.getElementById(`stop-${picked.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (picked.from === "map")
+      document.getElementById(`stop-${picked.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     else mapBox.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [picked]);
   const [over, setOver] = useState<number | null>(null);
@@ -71,14 +85,16 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
         lines.push({ points: [r.start, ...pts.map((s) => [s.lat, s.lon] as [number, number]), r.end], color: r.color });
       }
       const stops = r.stop_ids.map((id) => stopsById.get(id)).filter((s): s is Stop => !!s);
-      markers.push(...routePins(r, stops, r.color, {
-        titles: true,
-        each: (group, text) => ({
-          highlight: !!picked && group.some((s) => s.id === picked.id),
-          onClick: () => setPicked({ id: group[0].id, from: "map", n: Date.now() }),
-          title: `${r.name} #${text}: ${group.map((s) => [s.street, s.unit].filter(Boolean).join(" ")).join("; ")}`,
+      markers.push(
+        ...routePins(r, stops, r.color, {
+          titles: true,
+          each: (group, text) => ({
+            highlight: !!picked && group.some((s) => s.id === picked.id),
+            onClick: () => setPicked({ id: group[0].id, from: "map", n: Date.now() }),
+            title: `${r.name} #${text}: ${group.map((s) => [s.street, s.unit].filter(Boolean).join(" ")).join("; ")}`,
+          }),
         }),
-      }));
+      );
     }
     return { markers, lines };
   }, [result, focus, stopsById, picked]);
@@ -87,37 +103,62 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
   function chip(s: Stop) {
     const who = s.covering_for_id ? names.get(s.covering_for_id) || "a volunteer" : "";
     switch (s.label) {
-      case "usual": return <Badge kind="ok">Usual</Badge>;
-      case "added": return <Badge kind="info">Added today</Badge>;
-      case "covering": return <Badge kind="warn">Covering for {who}</Badge>;
-      case "overflow": return <Badge kind="bad">Over {who}'s limit</Badge>;
-      case "manual": return <Badge kind="info">Moved here by you</Badge>;
-      default: return null;
+      case "usual":
+        return <Badge kind="ok">Usual</Badge>;
+      case "added":
+        return <Badge kind="info">Added today</Badge>;
+      case "covering":
+        return <Badge kind="warn">Covering for {who}</Badge>;
+      case "overflow":
+        return <Badge kind="bad">Over {who}'s limit</Badge>;
+      case "manual":
+        return <Badge kind="info">Moved here by you</Badge>;
+      default:
+        return null;
     }
   }
 
   return (
     <div>
       <div className="totals">
-        <div><b>{result.totals.stops}</b> stops</div>
-        <div><b>{formatDuration(result.totals.time_s)}</b> driving</div>
-        <div><b>{formatDistance(result.totals.distance_m, settings.units)}</b></div>
+        <div>
+          <b>{result.totals.stops}</b> stops
+        </div>
+        <div>
+          <b>{formatDuration(result.totals.time_s)}</b> driving
+        </div>
+        <div>
+          <b>{formatDistance(result.totals.distance_m, settings.units)}</b>
+        </div>
         <div className="muted">
-          Optimized for {result.objective === "distance" ? "least miles" : "fastest time"} · arrival times allow {result.minutes_per_stop ?? 0} min per stop
+          Optimized for {result.objective === "distance" ? "least miles" : "fastest time"} · arrival times allow{" "}
+          {result.minutes_per_stop ?? 0} min per stop
         </div>
         <div className="spacer" />
-        <a className="btn" href={api.csvUrl(plan.id)}>Download CSV</a>
-        <a className="btn" href={`#/print/${plan.day}`} target="_blank" rel="noreferrer">Driver sheets</a>
+        <a className="btn" href={api.csvUrl(plan.id)}>
+          Download CSV
+        </a>
+        <a className="btn" href={`#/print/${plan.day}`} target="_blank" rel="noreferrer">
+          Driver sheets
+        </a>
       </div>
 
-      {result.warnings.map((w, i) => <div key={i} className="note note-warn">{w}</div>)}
+      {result.warnings.map((w, i) => (
+        <div key={i} className="note note-warn">
+          {w}
+        </div>
+      ))}
       {result.unassigned.length > 0 && (
         <div className="note note-error">
           <b>{result.unassigned.length} stop(s) are not on any route.</b>
           <ul>
             {result.unassigned.map((u) => {
               const s = stopsById.get(u.stop_id);
-              return <li key={u.stop_id}>{s ? addressLine(s) : `Stop ${u.stop_id}`}: {u.reason}</li>;
+              return (
+                <li key={u.stop_id}>
+                  {s ? addressLine(s) : `Stop ${u.stop_id}`}: {u.reason}
+                </li>
+              );
             })}
           </ul>
         </div>
@@ -125,29 +166,42 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
 
       <div ref={mapBox}>
         <MapView
-          tileUrl={settings.tile_url} height="min(70vh, 640px)" markers={markers} lines={lines}
+          tileUrl={settings.tile_url}
+          height="min(70vh, 640px)"
+          markers={markers}
+          lines={lines}
           fitKey={`${result.computed_at}:${focus}`}
-          panTo={picked && picked.from === "list" && pickedStop && pickedStop.lat !== null && pickedStop.lon !== null
-            ? { lat: pickedStop.lat, lon: pickedStop.lon, key: `${picked.id}:${picked.n}` } : null}
+          panTo={
+            picked && picked.from === "list" && pickedStop && pickedStop.lat !== null && pickedStop.lon !== null
+              ? { lat: pickedStop.lat, lon: pickedStop.lon, key: `${picked.id}:${picked.n}` }
+              : null
+          }
         />
       </div>
       <div className="hint">
         Click a stop to find it on the map, or a pin to find it in the list.{" "}
-        {focus === null ? "Click a driver's name to show only their route." : (
-          <button className="btn-link" onClick={() => setFocus(null)}>Show all routes</button>
+        {focus === null ? (
+          "Click a driver's name to show only their route."
+        ) : (
+          <button className="btn-link" onClick={() => setFocus(null)}>
+            Show all routes
+          </button>
         )}
       </div>
 
       <div className="cards">
         {result.routes.map((r) => {
           const stops = r.stop_ids.map((id) => stopsById.get(id)).filter((s): s is Stop => !!s);
-          const canMakeUsual = r.kind === "volunteer" && !r.locked && stops.some((s) => s.label === "added" || s.label === "manual");
+          const canMakeUsual =
+            r.kind === "volunteer" && !r.locked && stops.some((s) => s.label === "added" || s.label === "manual");
           return (
             <div key={r.driver_id} className={`card${focus === r.driver_id ? " card-focus" : ""}`}>
               <div className="card-head" onClick={() => setFocus(focus === r.driver_id ? null : r.driver_id)}>
                 <span className="dot" style={{ background: r.color }} />
                 <h3>{r.name}</h3>
-                <Badge kind={r.kind === "volunteer" ? "vol" : "staff"}>{r.kind === "volunteer" ? "Volunteer" : "Staff"}</Badge>
+                <Badge kind={r.kind === "volunteer" ? "vol" : "staff"}>
+                  {r.kind === "volunteer" ? "Volunteer" : "Staff"}
+                </Badge>
                 {r.locked && <Badge kind="lock">🔒 Locked</Badge>}
                 {r.avoid_highways && <Badge kind="plain">Avoids highways</Badge>}
                 {r.order_mode === "manual" && <Badge kind="info">Arranged by hand</Badge>}
@@ -156,7 +210,9 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
                 {r.stops} stops · {formatDuration(r.time_s)} driving · {formatDistance(r.distance_m, settings.units)}
               </div>
               {r.stops > 0 && (
-                <div className="card-usage">Leaves {clock(r.start_time)} · done about {clock(r.finish_time)}</div>
+                <div className="card-usage">
+                  Leaves {clock(r.start_time)} · done about {clock(r.finish_time)}
+                </div>
               )}
               {r.order_mode === "manual" && (
                 <button className="btn btn-small" disabled={busy} onClick={() => onResetOrder(r.driver_id)}>
@@ -164,7 +220,11 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
                 </button>
               )}
               {r.limits && usageText(r) && <div className="card-usage">Limits: {usageText(r)}</div>}
-              {r.over_limit.map((o, i) => <div key={i} className="note note-error">Over limit: {o}</div>)}
+              {r.over_limit.map((o, i) => (
+                <div key={i} className="note note-error">
+                  Over limit: {o}
+                </div>
+              ))}
               {canMakeUsual && (
                 <button className="btn btn-small" disabled={busy} onClick={() => onMakeAllUsual(r.driver_id)}>
                   Make all added stops usual
@@ -174,21 +234,60 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
               <ol className="stops">
                 {stops.map((s, i) => (
                   <li
-                    key={s.id} id={`stop-${s.id}`}
-                    onClick={(e) => { if (!(e.target as HTMLElement).closest("button, select, input, .grip")) setPicked({ id: s.id, from: "list", n: Date.now() }); }}
+                    key={s.id}
+                    id={`stop-${s.id}`}
+                    onClick={(e) => {
+                      if (!(e.target as HTMLElement).closest("button, select, input, .grip"))
+                        setPicked({ id: s.id, from: "list", n: Date.now() });
+                    }}
                     className={`${picked?.id === s.id ? "picked " : ""}${drag?.id === s.id ? "dragging" : ""}${over === s.id && drag && drag.driver === r.driver_id && drag.id !== s.id ? " drop-here" : ""}`}
-                    onDragOver={(e) => { if (drag && drag.driver === r.driver_id) { e.preventDefault(); setOver(s.id); } }}
-                    onDrop={(e) => { e.preventDefault(); drop(r, s.id); }}
+                    onDragOver={(e) => {
+                      if (drag && drag.driver === r.driver_id) {
+                        e.preventDefault();
+                        setOver(s.id);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      drop(r, s.id);
+                    }}
                   >
                     <span
-                      className="grip" title="Drag to move this stop within the route" draggable={!busy}
-                      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(s.id)); setDrag({ driver: r.driver_id, id: s.id }); }}
-                      onDragEnd={() => { setDrag(null); setOver(null); }}
-                    >⠿</span>
+                      className="grip"
+                      title="Drag to move this stop within the route"
+                      draggable={!busy}
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", String(s.id));
+                        setDrag({ driver: r.driver_id, id: s.id });
+                      }}
+                      onDragEnd={() => {
+                        setDrag(null);
+                        setOver(null);
+                      }}
+                    >
+                      ⠿
+                    </span>
                     <div className="stop-order">
-                      <button className="btn-plain" title="Earlier in the route" disabled={busy || i === 0} onClick={() => onReorder(s, -1)}>▲</button>
-                      <span className="stop-num" style={{ background: r.color }}>{s.stop_number}</span>
-                      <button className="btn-plain" title="Later in the route" disabled={busy || i === stops.length - 1} onClick={() => onReorder(s, 1)}>▼</button>
+                      <button
+                        className="btn-plain"
+                        title="Earlier in the route"
+                        disabled={busy || i === 0}
+                        onClick={() => onReorder(s, -1)}
+                      >
+                        ▲
+                      </button>
+                      <span className="stop-num" style={{ background: r.color }}>
+                        {s.stop_number}
+                      </span>
+                      <button
+                        className="btn-plain"
+                        title="Later in the route"
+                        disabled={busy || i === stops.length - 1}
+                        onClick={() => onReorder(s, 1)}
+                      >
+                        ▼
+                      </button>
                     </div>
                     <div className="stop-main">
                       <div>
@@ -198,24 +297,41 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
                       <div className="muted small">
                         {s.city} {s.zip} · list row {s.seq}
                         {s.label === "added" && s.added_time_s !== null && s.added_distance_m !== null && (
-                          <> · adds {formatDuration(Math.max(0, s.added_time_s))}, {formatDistance(Math.max(0, s.added_distance_m), settings.units)}</>
+                          <>
+                            {" "}
+                            · adds {formatDuration(Math.max(0, s.added_time_s))},{" "}
+                            {formatDistance(Math.max(0, s.added_distance_m), settings.units)}
+                          </>
                         )}
                       </div>
                       <SaveOnBlurInput
-                        trim className={(text) => `note-input${text ? " note-filled" : ""}`} value={s.notes} disabled={busy}
-                        placeholder="Add a note for this address" maxLength={300} onSave={(v) => onNotes(s, v)}
+                        trim
+                        className={(text) => `note-input${text ? " note-filled" : ""}`}
+                        value={s.notes}
+                        disabled={busy}
+                        placeholder="Add a note for this address"
+                        maxLength={300}
+                        onSave={(v) => onNotes(s, v)}
                       />
                       <div className="chips">
                         {chip(s)}
                         {s.is_new_address && r.kind === "volunteer" && <Badge kind="new">New address</Badge>}
                         {r.kind === "volunteer" && !r.locked && (s.label === "added" || s.label === "manual") && (
-                          <button className="btn btn-small" disabled={busy} onClick={() => onMakeUsual(s)}>Make usual stop</button>
+                          <button className="btn btn-small" disabled={busy} onClick={() => onMakeUsual(s)}>
+                            Make usual stop
+                          </button>
                         )}
                       </div>
                     </div>
                     <select
-                      className="move" value="" disabled={busy || (r.locked && s.label === "usual")}
-                      title={r.locked && s.label === "usual" ? "Locked: turn the lock off to move this stop" : "Move this stop for today"}
+                      className="move"
+                      value=""
+                      disabled={busy || (r.locked && s.label === "usual")}
+                      title={
+                        r.locked && s.label === "usual"
+                          ? "Locked: turn the lock off to move this stop"
+                          : "Move this stop for today"
+                      }
                       onChange={(e) => {
                         const v = e.target.value;
                         if (v === "auto") onMove(s, null);
@@ -224,9 +340,13 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
                     >
                       <option value="">Move…</option>
                       {s.manual_driver_id !== null && <option value="auto">Back to automatic</option>}
-                      {working.filter((d) => d.id !== r.driver_id && !(d.locked && d.kind === "volunteer")).map((d) => (
-                        <option key={d.id} value={d.id}>To {d.name}</option>
-                      ))}
+                      {working
+                        .filter((d) => d.id !== r.driver_id && !(d.locked && d.kind === "volunteer"))
+                        .map((d) => (
+                          <option key={d.id} value={d.id}>
+                            To {d.name}
+                          </option>
+                        ))}
                     </select>
                   </li>
                 ))}

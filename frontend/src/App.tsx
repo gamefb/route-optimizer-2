@@ -28,14 +28,23 @@ export default function App() {
   const [error, setError] = useState("");
 
   const reloadDrivers = useCallback(() => {
-    api.drivers().then(setDrivers).catch((e) => setError(errorText(e)));
+    api
+      .drivers()
+      .then(setDrivers)
+      .catch((e) => setError(errorText(e)));
   }, []);
   const reloadRegion = useCallback(() => {
-    api.region().then(setRegion).catch(() => undefined);
+    api
+      .region()
+      .then(setRegion)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    api.settings().then(setSettings).catch((e) => setError(errorText(e)));
+    api
+      .settings()
+      .then(setSettings)
+      .catch((e) => setError(errorText(e)));
     reloadDrivers();
     reloadRegion();
   }, [reloadDrivers, reloadRegion]);
@@ -68,7 +77,12 @@ export default function App() {
   }, [urlDay]);
   const day = urlDay || lastDay;
 
-  if (error && !settings) return <div className="page"><div className="note note-error">Cannot reach the server: {error}</div></div>;
+  if (error && !settings)
+    return (
+      <div className="page">
+        <div className="note note-error">Cannot reach the server: {error}</div>
+      </div>
+    );
   if (!settings) return <div className="page muted">Loading…</div>;
 
   if (page === "print") {
@@ -76,7 +90,9 @@ export default function App() {
   }
 
   const tab = (name: string, label: string, href: string) => (
-    <a className={`tab${page === name ? " tab-on" : ""}`} href={href}>{label}</a>
+    <a className={`tab${page === name ? " tab-on" : ""}`} href={href}>
+      {label}
+    </a>
   );
   return (
     <>
@@ -94,18 +110,38 @@ export default function App() {
       </header>
       {page === "day" && (
         <DayPage
-          day={day} setDay={(d) => { window.location.hash = `#/day/${d}`; }}
-          settings={settings} drivers={drivers} region={region} reloadDrivers={reloadDrivers}
+          day={day}
+          setDay={(d) => {
+            window.location.hash = `#/day/${d}`;
+          }}
+          settings={settings}
+          drivers={drivers}
+          region={region}
+          reloadDrivers={reloadDrivers}
         />
       )}
       {page === "drivers" && <DriversPage drivers={drivers} settings={settings} reload={reloadDrivers} />}
       {page === "addresses" && (
-        <AddressesPage drivers={drivers} settings={settings} driverId={parts[1] ? Number(parts[1]) : null} reloadDrivers={reloadDrivers} />
+        <AddressesPage
+          drivers={drivers}
+          settings={settings}
+          driverId={parts[1] ? Number(parts[1]) : null}
+          reloadDrivers={reloadDrivers}
+        />
       )}
       {page === "settings" && (
         <SettingsPage
-          settings={settings} region={region} onSettings={setSettings} reloadRegion={reloadRegion}
-          reloadAll={() => { api.settings().then(setSettings).catch(() => undefined); reloadDrivers(); }}
+          settings={settings}
+          region={region}
+          onSettings={setSettings}
+          reloadRegion={reloadRegion}
+          reloadAll={() => {
+            api
+              .settings()
+              .then(setSettings)
+              .catch(() => undefined);
+            reloadDrivers();
+          }}
         />
       )}
     </>
