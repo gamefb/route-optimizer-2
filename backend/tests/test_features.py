@@ -236,11 +236,11 @@ def test_drag_order_driver_start_time_and_backup_folder(client, tmp_path, monkey
     bad = client.post(f"/api/plans/{plan['id']}/set-order", json={"driver_id": alex["id"], "stop_ids": wanted[:-1]})
     assert bad.status_code == 400
 
-    from app import main
+    from app.api import backup
 
     assert client.get("/api/backup/files").json()["enabled"] is False
-    monkeypatch.setattr(main, "BACKUP_DIR", str(tmp_path))
-    monkeypatch.setattr(main, "BACKUP_KEEP", 2)
+    monkeypatch.setattr(backup, "BACKUP_DIR", str(tmp_path))
+    monkeypatch.setattr(backup, "BACKUP_KEEP", 2)
     for old in ("2020-01-01", "2020-01-02", "2020-01-03"):
         (tmp_path / f"route-planner-backup-{old}.json").write_text("{}")
     name = client.post("/api/backup/save").json()["name"]
