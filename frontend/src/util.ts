@@ -1,4 +1,4 @@
-import type { Stop } from "./types";
+import type { Plan, Stop } from "./types";
 
 export function formatDuration(seconds: number): string {
   const minutes = Math.round(seconds / 60);
@@ -11,6 +11,20 @@ export function formatDuration(seconds: number): string {
 export function formatDistance(meters: number, units: "mi" | "km"): string {
   const value = units === "mi" ? meters / 1609.344 : meters / 1000;
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units}`;
+}
+
+export interface DriverChange {
+  stop: Stop;
+  from: number | null; // driver id before, or null if it was not on a route
+  to: number | null;
+}
+
+/** Stops that ended up with a different driver after a change, leaving out the one moved on purpose. */
+export function driverChanges(before: Plan, after: Plan, movedId: number): DriverChange[] {
+  const was = new Map(before.stops.map((s) => [s.id, s.driver_id]));
+  return after.stops
+    .filter((s) => s.id !== movedId && was.has(s.id) && was.get(s.id) !== s.driver_id)
+    .map((s) => ({ stop: s, from: was.get(s.id) ?? null, to: s.driver_id }));
 }
 
 export function addressLine(s: Pick<Stop, "street" | "unit" | "city" | "state" | "zip">): string {

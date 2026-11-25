@@ -23,14 +23,16 @@ export default function ReviewTable(p: Props) {
   const [onlyAttention, setOnlyAttention] = useState(false);
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState({ street: "", unit: "", city: "", state: "", zip: "" });
-  const names = new Map(p.drivers.map((d) => [d.id, d.name]));
+  const byId = new Map(p.drivers.map((d) => [d.id, d]));
+  const name = (id: number | null) => (id !== null && byId.get(id)?.name) || "";
+  const built = p.plan.result !== null; // once routes exist, each row shows who has it
   const needs = p.plan.stops.filter((s) => s.match_state !== "matched");
   const base = onlyAttention ? needs : p.plan.stops;
   const rows = query.trim()
     ? base.filter((s) =>
         fuzzyMatch(
           query,
-          `${s.seq} ${addressLine(s)} ${s.usual_driver_id ? names.get(s.usual_driver_id) || "" : ""} ${s.extras.join(" ")}`,
+          `${s.seq} ${addressLine(s)} ${name(s.usual_driver_id)} ${built ? name(s.driver_id) : ""} ${s.extras.join(" ")}`,
         ),
       )
     : base;
@@ -90,7 +92,7 @@ export default function ReviewTable(p: Props) {
           className="search"
           type="search"
           value={query}
-          placeholder="Search the table (street, city, zip, volunteer)"
+          placeholder="Search the table (street, city, zip, driver)"
           onChange={(e) => setQuery(e.target.value)}
         />
         {query.trim() && (
@@ -116,6 +118,7 @@ export default function ReviewTable(p: Props) {
               <th>Zip</th>
               <th>Status</th>
               <th>Usual volunteer</th>
+              {built && <th>Driver today</th>}
               <th></th>
             </tr>
           </thead>
@@ -146,7 +149,19 @@ export default function ReviewTable(p: Props) {
                   {status(s)}
                   {s.duplicate_of_seq !== null && <Badge kind="warn">Same as row {s.duplicate_of_seq}</Badge>}
                 </td>
-                <td>{s.usual_driver_id ? names.get(s.usual_driver_id) || "" : ""}</td>
+                <td>{name(s.usual_driver_id)}</td>
+                {built && (
+                  <td className="on-route">
+                    {s.driver_id !== null && s.stop_number !== null ? (
+                      <>
+                        <span className="dot" style={{ background: byId.get(s.driver_id)?.color }} />{" "}
+                        {name(s.driver_id) || "A driver"} · stop {s.stop_number}
+                      </>
+                    ) : (
+                      <span className="muted">Not on a route</span>
+                    )}
+                  </td>
+                )}
                 <td className="row-actions">
                   <button className="btn-plain" title="Move up" disabled={p.busy} onClick={() => p.onShift(s, -1)}>
                     ↑
@@ -173,7 +188,7 @@ export default function ReviewTable(p: Props) {
                   />
                 </td>
               ))}
-              <td colSpan={3}>
+              <td colSpan={built ? 4 : 3}>
                 <button
                   className="btn btn-small"
                   disabled={p.busy || !draft.street.trim()}

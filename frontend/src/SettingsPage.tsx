@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { RegionInfo, Settings, SettingsPatch } from "./types";
-import { Badge, ErrorNote } from "./ui";
+import { Badge, ErrorToast, Toast } from "./ui";
 import { useAction } from "./useAction";
 
 const PAID = [
@@ -36,7 +36,7 @@ export default function SettingsPage({
   const [tileUrl, setTileUrl] = useState(settings.tile_url);
   const [minutes, setMinutes] = useState(String(settings.minutes_per_stop));
   const [keys, setKeys] = useState<Record<string, string>>({});
-  const { error, run } = useAction();
+  const { error, setError, run } = useAction();
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const [auto, setAuto] = useState<{ enabled: boolean; keep: number; files: { name: string; bytes: number }[] } | null>(
@@ -112,8 +112,12 @@ export default function SettingsPage({
   return (
     <div className="page narrow">
       <h1>Settings</h1>
-      <ErrorNote message={error} />
-      {notice && <div className="note note-info">{notice}</div>}
+      <ErrorToast message={error} onClose={() => setError("")} />
+      {notice && (
+        <Toast kind="info" onClose={() => setNotice("")}>
+          {notice}
+        </Toast>
+      )}
 
       <section>
         <h2>Map region</h2>

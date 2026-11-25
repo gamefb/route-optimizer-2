@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import type { Address, Driver, ImportJob, PendingAddress, Settings } from "./types";
-import { ErrorNote, LocationPicker, Modal, PickedLocation, SaveOnBlurInput } from "./ui";
+import { ErrorNote, ErrorToast, LocationPicker, Modal, PickedLocation, SaveOnBlurInput } from "./ui";
 import { errorText, useAction } from "./useAction";
 import { addressLine } from "./util";
 
@@ -146,7 +146,7 @@ export default function AddressesPage({
           {rows.length} address{rows.length === 1 ? "" : "es"}
         </span>
       </div>
-      {!fixing && <ErrorNote message={error} />}
+      {!fixing && <ErrorToast message={error} onClose={() => setError("")} />}
       <div className="table-wrap">
         <table className="grid">
           <thead>
