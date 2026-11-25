@@ -1,7 +1,8 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { InputHTMLAttributes, ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import MapView from "./MapView";
 import type { Candidate } from "./types";
+import { useAction } from "./useAction";
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
@@ -30,6 +31,29 @@ export function Badge({ kind, children }: { kind: string; children: ReactNode })
   return <span className={`badge badge-${kind}`}>{children}</span>;
 }
 
+type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "className" | "onChange" | "onBlur" | "onKeyDown">;
+
+/** A text box that saves when you leave it or press Enter, and only if the text changed. */
+export function SaveOnBlurInput({ value, onSave, trim, className, ...rest }: InputProps & {
+  value: string;
+  onSave: (v: string) => void;
+  trim?: boolean; // ignore spaces at either end
+  className?: string | ((text: string) => string);
+}) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  const next = trim ? text.trim() : text;
+  return (
+    <input
+      {...rest}
+      className={typeof className === "function" ? className(text) : className} value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => next !== value && onSave(next)}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+    />
+  );
+}
+
 export interface PickedLocation {
   label: string;
   lat: number | null;
@@ -45,25 +69,16 @@ export function LocationPicker({ value, onChange, tileUrl, placeholder }: {
 }) {
   const [query, setQuery] = useState(value.label);
   const [found, setFound] = useState<Candidate[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const { busy, error, setError, run } = useAction();
 
   useEffect(() => setQuery(value.label), [value.label]);
 
-  async function search() {
-    setBusy(true);
-    setError("");
-    try {
-      const res = await api.geocode(query);
-      setFound(res);
-      if (!res.length) setError("No match found. Check the address, or click the map to place the pin.");
-      else pick(res[0]);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const search = () => run(async () => {
+    const res = await api.geocode(query);
+    setFound(res);
+    if (!res.length) setError("No match found. Check the address, or click the map to place the pin.");
+    else pick(res[0]);
+  });
 
   function pick(c: Candidate) {
     onChange({ label: query || c.label, lat: c.lat, lon: c.lon });

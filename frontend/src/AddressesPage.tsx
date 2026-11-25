@@ -1,26 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import type { Address, Driver, ImportJob, PendingAddress, Settings } from "./types";
-import { ErrorNote, LocationPicker, Modal, PickedLocation } from "./ui";
+import { ErrorNote, LocationPicker, Modal, PickedLocation, SaveOnBlurInput } from "./ui";
+import { errorText, useAction } from "./useAction";
 import { addressLine } from "./util";
 
 const IMPORT_ROLES: Record<string, string> = {
   street: "Street address", unit: "Unit number", city: "City", state: "State", zip: "Zip",
   volunteer: "Usual volunteer (name)", notes: "Notes", extra: "Ignore",
 };
-
-function NoteCell({ value, onSave }: { value: string; onSave: (v: string) => void }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
-  return (
-    <input
-      className="cell" style={{ width: "100%", minWidth: 160 }} value={text} placeholder="Add a note" maxLength={300}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => text.trim() !== value && onSave(text.trim())}
-      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-    />
-  );
-}
 
 export default function AddressesPage({ drivers, settings, driverId, reloadDrivers }: {
   drivers: Driver[];
@@ -31,7 +19,7 @@ export default function AddressesPage({ drivers, settings, driverId, reloadDrive
   const [rows, setRows] = useState<Address[]>([]);
   const [waiting, setWaiting] = useState<PendingAddress[]>([]);
   const [q, setQ] = useState("");
-  const [error, setError] = useState("");
+  const { error, setError, run } = useAction();
   const [fixing, setFixing] = useState<{ title: string; address?: Address; pending?: PendingAddress } | null>(null);
   const [spot, setSpot] = useState<PickedLocation>({ label: "", lat: null, lon: null });
   const [importing, setImporting] = useState(false);
@@ -40,25 +28,21 @@ export default function AddressesPage({ drivers, settings, driverId, reloadDrive
   const filterDriver = driverId ? byId.get(driverId) : undefined;
 
   const load = useCallback(() => {
-    api.addresses(q, driverId ?? undefined).then(setRows).catch((e) => setError((e as Error).message));
+    api.addresses(q, driverId ?? undefined).then(setRows).catch((e) => setError(errorText(e)));
     api.pending().then(setWaiting).catch(() => undefined);
-  }, [q, driverId]);
+  }, [q, driverId, setError]);
 
   useEffect(() => {
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
   }, [load]);
 
-  async function act(fn: () => Promise<unknown>) {
-    setError("");
-    try {
-      await fn();
-      load();
-      reloadDrivers();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  // Make a change, then show the lists as they now stand.
+  const act = (fn: () => Promise<unknown>) => run(async () => {
+    await fn();
+    load();
+    reloadDrivers();
+  });
 
   return (
     <div className="page">
@@ -136,7 +120,12 @@ export default function AddressesPage({ drivers, settings, driverId, reloadDrive
                       ))}
                     </select>
                   </td>
-                  <td><NoteCell value={a.notes} onSave={(v) => act(() => api.setNotes(a.id, v))} /></td>
+                  <td>
+                    <SaveOnBlurInput
+                      trim className="cell" style={{ width: "100%", minWidth: 160 }} value={a.notes}
+                      placeholder="Add a note" maxLength={300} onSave={(v) => act(() => api.setNotes(a.id, v))}
+                    />
+                  </td>
                   <td className="row-actions">
                     <button
                       className="btn btn-small"
@@ -185,7 +174,7 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
   const [layout, setLayout] = useState<string[]>([]);
   const [autoSave, setAutoSave] = useState(true);
   const [job, setJob] = useState<ImportJob | null>(null);
-  const [error, setError] = useState("");
+  const { error, run } = useAction();
 
   useEffect(() => {
     if (job?.status !== "running") return;
@@ -193,25 +182,13 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
     return () => clearInterval(t);
   }, [job?.status]);
 
-  async function read() {
-    setError("");
-    try {
-      const p = await api.importPreview(text);
-      setPreview(p);
-      setLayout(p.layout);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  const read = () => run(async () => {
+    const p = await api.importPreview(text);
+    setPreview(p);
+    setLayout(p.layout);
+  });
 
-  async function start() {
-    setError("");
-    try {
-      setJob(await api.importStart(text, layout, autoSave));
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  const start = () => run(async () => setJob(await api.importStart(text, layout, autoSave)));
 
   return (
     <Modal title="Import an address list" onClose={onClose} wide>

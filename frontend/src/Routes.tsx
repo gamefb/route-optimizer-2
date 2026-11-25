@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import MapView, { MapLine, MapMarker } from "./MapView";
+import { routePins } from "./routePins";
 import type { Driver, Plan, RouteResult, Settings, Stop } from "./types";
-import { Badge } from "./ui";
+import { Badge, SaveOnBlurInput } from "./ui";
 import { addressLine, clock, decodeShape, formatDistance, formatDuration } from "./util";
 
 interface Props {
@@ -17,20 +18,6 @@ interface Props {
   onResetOrder: (driverId: number) => void;
   onSetOrder: (driverId: number, stopIds: number[]) => void;
   onNotes: (stop: Stop, notes: string) => void;
-}
-
-function NoteLine({ value, disabled, onSave }: { value: string; disabled: boolean; onSave: (v: string) => void }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
-  return (
-    <input
-      className={`note-input${text ? " note-filled" : ""}`} value={text} disabled={disabled}
-      placeholder="Add a note for this address" maxLength={300}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => text.trim() !== value && onSave(text.trim())}
-      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-    />
-  );
 }
 
 export function usageText(r: RouteResult): string {
@@ -83,28 +70,15 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
         const pts = r.stop_ids.map((id) => stopsById.get(id)).filter((s): s is Stop => !!s && s.lat !== null);
         lines.push({ points: [r.start, ...pts.map((s) => [s.lat, s.lon] as [number, number]), r.end], color: r.color });
       }
-      markers.push({ lat: r.start[0], lon: r.start[1], color: r.color, shape: "square", text: "S", title: `${r.name}: start` });
-      if (r.end[0] !== r.start[0] || r.end[1] !== r.start[1]) {
-        markers.push({ lat: r.end[0], lon: r.end[1], color: r.color, shape: "square", text: "E", title: `${r.name}: end` });
-      }
-      // Several units in one building share a pin labeled with their range.
-      const groups = new Map<string, Stop[]>();
-      for (const id of r.stop_ids) {
-        const s = stopsById.get(id);
-        if (!s || s.lat === null || s.lon === null) continue;
-        const key = `${s.lat},${s.lon}`;
-        groups.set(key, [...(groups.get(key) || []), s]);
-      }
-      for (const group of groups.values()) {
-        const nums = group.map((s) => s.stop_number || 0).sort((a, b) => a - b);
-        const text = nums.length > 1 ? `${nums[0]}-${nums[nums.length - 1]}` : String(nums[0]);
-        markers.push({
+      const stops = r.stop_ids.map((id) => stopsById.get(id)).filter((s): s is Stop => !!s);
+      markers.push(...routePins(r, stops, r.color, {
+        titles: true,
+        each: (group, text) => ({
           highlight: !!picked && group.some((s) => s.id === picked.id),
           onClick: () => setPicked({ id: group[0].id, from: "map", n: Date.now() }),
-          lat: group[0].lat as number, lon: group[0].lon as number, color: r.color, text,
           title: `${r.name} #${text}: ${group.map((s) => [s.street, s.unit].filter(Boolean).join(" ")).join("; ")}`,
-        });
-      }
+        }),
+      }));
     }
     return { markers, lines };
   }, [result, focus, stopsById, picked]);
@@ -227,7 +201,10 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
                           <> · adds {formatDuration(Math.max(0, s.added_time_s))}, {formatDistance(Math.max(0, s.added_distance_m), settings.units)}</>
                         )}
                       </div>
-                      <NoteLine value={s.notes} disabled={busy} onSave={(v) => onNotes(s, v)} />
+                      <SaveOnBlurInput
+                        trim className={(text) => `note-input${text ? " note-filled" : ""}`} value={s.notes} disabled={busy}
+                        placeholder="Add a note for this address" maxLength={300} onSave={(v) => onNotes(s, v)}
+                      />
                       <div className="chips">
                         {chip(s)}
                         {s.is_new_address && r.kind === "volunteer" && <Badge kind="new">New address</Badge>}

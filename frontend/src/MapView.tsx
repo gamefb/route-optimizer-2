@@ -83,8 +83,13 @@ export default function MapView({ tileUrl, markers = [], lines = [], height = 36
       }
     }
     for (const mk of markers) {
-      const marker = L.marker([mk.lat, mk.lon], { icon: icon(mk), draggable: !!mk.draggable, title: mk.title });
-      if (mk.title) marker.bindTooltip(mk.title);
+      const marker = L.marker([mk.lat, mk.lon], { icon: icon(mk), draggable: !!mk.draggable });
+      if (mk.title) {
+        // Leaflet reads a string as HTML. The title carries pasted address text, so pass it as plain text.
+        const label = document.createElement("span");
+        label.textContent = mk.title;
+        marker.bindTooltip(label);
+      }
       if (mk.onClick) marker.on("click", mk.onClick);
       if (mk.highlight) marker.setZIndexOffset(1000);
       if (mk.onDrag) {
@@ -94,6 +99,7 @@ export default function MapView({ tileUrl, markers = [], lines = [], height = 36
         });
       }
       marker.addTo(group);
+      if (mk.title) marker.getElement()?.setAttribute("aria-label", mk.title);
     }
   }, [markers, lines]);
 

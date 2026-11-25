@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "./api";
 import type { Driver, Settings } from "./types";
 import { Badge, ErrorNote, LocationPicker, Modal } from "./ui";
+import { useAction } from "./useAction";
 
 const COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#4d7c0f", "#b45309", "#475569"];
 
@@ -23,13 +24,10 @@ function toDraft(d: Driver): Draft {
 
 export default function DriversPage({ drivers, settings, reload }: { drivers: Driver[]; settings: Settings; reload: () => void }) {
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { busy, error, setError, run } = useAction();
 
-  async function save() {
+  function save() {
     if (!draft) return;
-    setBusy(true);
-    setError("");
     const body = {
       ...draft,
       zip_codes: draft.zipText.split(/[\s,;]+/).filter(Boolean),
@@ -37,27 +35,21 @@ export default function DriversPage({ drivers, settings, reload }: { drivers: Dr
       end_lat: draft.sameEnd ? draft.start_lat : draft.end_lat,
       end_lon: draft.sameEnd ? draft.start_lon : draft.end_lon,
     };
-    try {
+    run(async () => {
       if (draft.id) await api.updateDriver(draft.id, body);
       else await api.createDriver(body);
       setDraft(null);
       reload();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  async function remove(d: Driver) {
+  function remove(d: Driver) {
     const extra = d.usual_stops ? ` Their ${d.usual_stops} usual stop(s) will no longer have a usual driver.` : "";
     if (!window.confirm(`Remove ${d.name}?${extra}`)) return;
-    try {
+    run(async () => {
       await api.deleteDriver(d.id);
       reload();
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    });
   }
 
   const volunteer = draft?.kind === "volunteer";

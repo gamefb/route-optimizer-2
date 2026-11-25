@@ -6,6 +6,7 @@ import DriversPage from "./DriversPage";
 import PrintPage from "./PrintPage";
 import SettingsPage from "./SettingsPage";
 import type { Driver, RegionInfo, Settings } from "./types";
+import { errorText } from "./useAction";
 import { today } from "./util";
 
 function useHash(): string[] {
@@ -27,14 +28,14 @@ export default function App() {
   const [error, setError] = useState("");
 
   const reloadDrivers = useCallback(() => {
-    api.drivers().then(setDrivers).catch((e) => setError((e as Error).message));
+    api.drivers().then(setDrivers).catch((e) => setError(errorText(e)));
   }, []);
   const reloadRegion = useCallback(() => {
     api.region().then(setRegion).catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    api.settings().then(setSettings).catch((e) => setError((e as Error).message));
+    api.settings().then(setSettings).catch((e) => setError(errorText(e)));
     reloadDrivers();
     reloadRegion();
   }, [reloadDrivers, reloadRegion]);

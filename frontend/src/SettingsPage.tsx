@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { RegionInfo, Settings, SettingsPatch } from "./types";
 import { Badge, ErrorNote } from "./ui";
+import { useAction } from "./useAction";
 
 const PAID = [
   { id: "google", name: "Google", key: "google_key", has: "has_google_key", hint: "Google Maps Platform key with the Geocoding API turned on" },
@@ -23,7 +24,7 @@ export default function SettingsPage({ settings, region, onSettings, reloadRegio
   const [tileUrl, setTileUrl] = useState(settings.tile_url);
   const [minutes, setMinutes] = useState(String(settings.minutes_per_stop));
   const [keys, setKeys] = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
+  const { error, run } = useAction();
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const [auto, setAuto] = useState<{ enabled: boolean; keep: number; files: { name: string; bytes: number }[] } | null>(null);
@@ -34,45 +35,42 @@ export default function SettingsPage({ settings, region, onSettings, reloadRegio
     api.regionCatalog().then(setCatalog).catch(() => setCatalog([]));
   }, []);
 
-  async function save(patch: SettingsPatch) {
-    setError("");
-    try {
-      onSettings(await api.saveSettings(patch));
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  const save = (patch: SettingsPatch) => run(async () => onSettings(await api.saveSettings(patch)));
 
-  async function load() {
-    setError("");
+  function load() {
     const picked = catalog.find((c) => c.url === choice);
     const name = choice === "custom" ? customName : picked?.name || "";
     const url = choice === "custom" ? customUrl : choice;
     if (region?.ready && !window.confirm(`Switch the map to ${name || "the new region"}? The current map stays in use until the new one is ready.`)) return;
-    try {
+    run(async () => {
       await api.loadRegion(name, url);
       reloadRegion();
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    });
   }
 
   async function restore(file: File) {
-    setError("");
     setNotice("");
-    try {
-      const data = JSON.parse(await file.text());
+    await run(async () => {
+      let data;
+      try {
+        data = JSON.parse(await file.text());
+      } catch {
+        throw new Error("That file is not a Route Planner backup.");
+      }
       const when = typeof data.exported_at === "string" ? ` from ${data.exported_at.replace("T", " ")}` : "";
       if (!window.confirm(`Load the backup${when}? This replaces every driver, address and setting, and clears the saved day plans.`)) return;
       const res = await api.restore(data);
       setNotice(`Backup loaded: ${res.drivers} drivers and ${res.addresses} addresses.`);
       reloadAll();
-    } catch (e) {
-      setError(e instanceof SyntaxError ? "That file is not a Route Planner backup." : (e as Error).message);
-    } finally {
-      if (fileInput.current) fileInput.current.value = "";
-    }
+    });
+    if (fileInput.current) fileInput.current.value = "";
   }
+
+  const backUpNow = () => run(async () => {
+    const saved = await api.backupSave();
+    setNotice(`Saved ${saved.name}.`);
+    loadAuto();
+  });
 
   const pending = region?.pending;
   const working = pending && pending.status !== "error";
@@ -220,7 +218,7 @@ export default function SettingsPage({ settings, region, onSettings, reloadRegio
             {auto.files.length ? <>Latest: <b>{auto.files[0].name}</b> ({auto.files.length} file{auto.files.length === 1 ? "" : "s"}).</> : "No file has been written yet."}{" "}
             <button
               className="btn btn-small"
-              onClick={async () => { setError(""); try { const r = await api.backupSave(); setNotice(`Saved ${r.name}.`); loadAuto(); } catch (e) { setError((e as Error).message); } }}
+              onClick={backUpNow}
             >Back up now</button>
           </div>
         ) : (

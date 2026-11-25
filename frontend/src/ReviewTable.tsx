@@ -1,25 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Driver, Plan, Stop } from "./types";
-import { Badge } from "./ui";
+import { Badge, SaveOnBlurInput } from "./ui";
 import { addressLine, fuzzyMatch } from "./util";
 
 const FIELDS = ["street", "unit", "city", "state", "zip"] as const;
-
-function Cell({ value, onSave, width }: { value: string; onSave: (v: string) => void; width: number }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
-  return (
-    <input
-      className="cell" style={{ width: `${width}ch` }} value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => text !== value && onSave(text)}
-      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-    />
-  );
-}
+const WIDTH_CH = { street: 24, unit: 8, city: 14, state: 4, zip: 10 }; // room for a typical value, in characters
 
 interface Props {
-  plan: Plan & { sample?: string[] };
+  plan: Plan;
   drivers: Driver[];
   busy: boolean;
   onEdit: (stop: Stop, fields: Record<string, string>) => void;
@@ -108,8 +96,8 @@ export default function ReviewTable(p: Props) {
                 <td className="num">{s.seq}</td>
                 {FIELDS.map((f) => (
                   <td key={f}>
-                    <Cell
-                      value={s[f]} width={f === "street" ? 24 : f === "city" ? 14 : f === "unit" ? 8 : f === "zip" ? 10 : 4}
+                    <SaveOnBlurInput
+                      className="cell" style={{ width: `${WIDTH_CH[f]}ch` }} value={s[f]}
                       onSave={(v) => p.onEdit(s, { street: s.street, unit: s.unit, city: s.city, state: s.state, zip: s.zip, [f]: v })}
                     />
                   </td>
@@ -132,7 +120,7 @@ export default function ReviewTable(p: Props) {
                 <td key={f}>
                   <input
                     className="cell" placeholder={f === "street" ? "Add a row: street" : f}
-                    style={{ width: `${f === "street" ? 24 : f === "city" ? 14 : f === "unit" ? 8 : f === "zip" ? 10 : 4}ch` }}
+                    style={{ width: `${WIDTH_CH[f]}ch` }}
                     value={draft[f]} onChange={(e) => setDraft({ ...draft, [f]: e.target.value })}
                   />
                 </td>

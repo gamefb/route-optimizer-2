@@ -4,6 +4,7 @@ import ReviewTable from "./ReviewTable";
 import Routes from "./Routes";
 import type { Driver, Plan, RegionInfo, Settings, Stop } from "./types";
 import { Badge, ErrorNote, Fold } from "./ui";
+import { errorText, useAction } from "./useAction";
 import { clock, longDate, shiftDay, today } from "./util";
 import ValidateDialog from "./ValidateDialog";
 
@@ -22,8 +23,7 @@ interface Props {
 
 export default function DayPage({ day, setDay, settings, drivers, region, reloadDrivers }: Props) {
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const { busy, error, setError, run: act } = useAction();
   const [text, setText] = useState("");
   const [showPaste, setShowPaste] = useState(false);
   const [validating, setValidating] = useState<number | null>(null);
@@ -33,23 +33,15 @@ export default function DayPage({ day, setDay, settings, drivers, region, reload
     setPlan(null);
     setError("");
     setValidating(null);
-    api.planForDay(day).then(setPlan).catch((e) => setError((e as Error).message));
-  }, [day]);
+    api.planForDay(day).then(setPlan).catch((e) => setError(errorText(e)));
+  }, [day, setError]);
 
-  const run = useCallback(async (fn: () => Promise<Plan>): Promise<Plan | null> => {
-    setBusy(true);
-    setError("");
-    try {
-      const next = await fn();
-      setPlan(next);
-      return next;
-    } catch (e) {
-      setError((e as Error).message);
-      return null;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  // Every change to the day answers with the whole plan; show it as soon as it arrives.
+  const run = useCallback((fn: () => Promise<Plan>) => act(async () => {
+    const next = await fn();
+    setPlan(next);
+    return next;
+  }), [act]);
 
   const dayHead = (
     <div className="day-head">
@@ -93,7 +85,7 @@ export default function DayPage({ day, setDay, settings, drivers, region, reload
 
   const mapMissing = region !== null && !region.ready;
   const layout = p.layout.length ? p.layout : ["street", "unit", "city", "state", "zip"];
-  const sample = (p as Plan & { sample?: string[] }).sample || [];
+  const sample = p.sample;
 
   return (
     <div className="page">

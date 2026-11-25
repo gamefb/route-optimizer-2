@@ -3,6 +3,7 @@ import { api } from "./api";
 import MapView from "./MapView";
 import type { Address, Candidate, Stop } from "./types";
 import { ErrorNote, Modal } from "./ui";
+import { errorText, useAction } from "./useAction";
 import { addressLine } from "./util";
 
 interface Props {
@@ -23,8 +24,7 @@ export default function ValidateDialog({ stop, remaining, tileUrl, onConfirm, on
   const [pin, setPin] = useState<{ lat: number; lon: number } | null>(null);
   const [moved, setMoved] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const { busy, error, setError, run: act } = useAction();
 
   useEffect(() => {
     let live = true;
@@ -43,25 +43,13 @@ export default function ValidateDialog({ stop, remaining, tileUrl, onConfirm, on
         if (res.candidates.length) setPin({ lat: res.candidates[0].lat, lon: res.candidates[0].lon });
         if (res.error && !res.candidates.length) setError(res.error);
       })
-      .catch((e) => live && setError((e as Error).message))
+      .catch((e) => live && setError(errorText(e)))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
-  }, [stop.id]);
+  }, [stop.id, setError]);
 
   const current = candidates[chosen];
   const outside = !moved && current?.on_map === false;
-
-  async function act(fn: () => Promise<void>) {
-    setBusy(true);
-    setError("");
-    try {
-      await fn();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <Modal title="Check this address on the map" onClose={onClose} wide>

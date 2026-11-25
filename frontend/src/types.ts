@@ -134,6 +134,7 @@ export interface Plan {
   stale: boolean;
   start_time: string;
   undo_label: string;
+  sample: string[]; // the first pasted row, shown above the column choices
   result: PlanResult | null;
   stops: Stop[];
 }

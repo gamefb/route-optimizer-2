@@ -2,9 +2,11 @@ import { toPng } from "html-to-image";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
-import MapView, { MapLine, MapMarker } from "./MapView";
+import MapView, { MapLine } from "./MapView";
+import { routePins } from "./routePins";
 import type { Driver, Plan, RouteResult, Settings, Stop } from "./types";
 import { ErrorNote } from "./ui";
+import { errorText } from "./useAction";
 import { clock, decodeShape, formatDistance, formatDuration, googleMapsLinks, longDate } from "./util";
 
 /** Printable driver sheets: one page per driver with a numbered map and the stop list. */
@@ -14,7 +16,7 @@ export default function PrintPage({ day, settings, drivers }: { day: string; set
   const [only, setOnly] = useState<number | "all">("all");
 
   useEffect(() => {
-    api.planForDay(day).then(setPlan).catch((e) => setError((e as Error).message));
+    api.planForDay(day).then(setPlan).catch((e) => setError(errorText(e)));
   }, [day]);
 
   if (error) return <div className="page"><ErrorNote message={error} /></div>;
@@ -77,22 +79,7 @@ function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan
 
   const { markers, lines } = useMemo(() => {
     const lines: MapLine[] = r.shapes.map((s) => ({ points: decodeShape(s), color: "#111827" }));
-    const markers: MapMarker[] = [{ lat: r.start[0], lon: r.start[1], color: "#111827", shape: "square", text: "S" }];
-    if (r.end[0] !== r.start[0] || r.end[1] !== r.start[1]) {
-      markers.push({ lat: r.end[0], lon: r.end[1], color: "#111827", shape: "square", text: "E" });
-    }
-    const groups = new Map<string, number[]>();
-    for (const s of stops) {
-      if (s.lat === null || s.lon === null) continue;
-      const key = `${s.lat},${s.lon}`;
-      groups.set(key, [...(groups.get(key) || []), s.stop_number || 0]);
-    }
-    for (const [key, nums] of groups) {
-      const [lat, lon] = key.split(",").map(Number);
-      nums.sort((a, b) => a - b);
-      markers.push({ lat, lon, color: "#111827", text: nums.length > 1 ? `${nums[0]}-${nums[nums.length - 1]}` : String(nums[0]) });
-    }
-    return { markers, lines };
+    return { markers: routePins(r, stops, "#111827"), lines };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r, plan.stops]);
 
