@@ -14,7 +14,9 @@ from pathlib import Path
 import uvicorn
 from fastapi.staticfiles import StaticFiles
 
-from . import conftest  # sets up a throwaway database and data folder
+from . import conftest  # sets up a throwaway database and data folder, so it comes before the app
+
+# isort: split
 from app import geocode as geo
 from app import routing
 from app.main import app

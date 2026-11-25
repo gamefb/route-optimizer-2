@@ -6,6 +6,7 @@ background, and the old one stays in use until the new one is ready.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -47,10 +48,8 @@ class Router:
 
     def _load_state(self) -> None:
         if self.state_file.exists():
-            try:
+            with contextlib.suppress(Exception):
                 self.state.update(json.loads(self.state_file.read_text()))
-            except Exception:
-                pass
         if self.state.get("dir") and Path(self.state["dir"]).exists():
             try:
                 self._actor = valhalla.Actor(str(Path(self.state["dir"]) / "valhalla.json"))
@@ -230,7 +229,7 @@ class Router:
     def route_shapes(self, points: list[tuple[float, float]], avoid_highways: bool, shortest: bool) -> list[str]:
         """The road path through the points in order, as encoded polylines (precision 6)."""
         actor = self._require()
-        cleaned = [points[0]] + [p for prev, p in zip(points, points[1:]) if p != prev]
+        cleaned = [points[0]] + [p for prev, p in zip(points, points[1:], strict=False) if p != prev]
         if len(cleaned) < 2:
             return []
         req = {

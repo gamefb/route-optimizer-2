@@ -60,16 +60,39 @@ def import_preview(body: ImportIn, db: Session = Depends(get_db)):
 def _import_fields(cells: list[str], layout: list[str]) -> dict:
     address_layout = [r if r in ROLES else "extra" for r in layout]
     fields = apply_layout(cells, address_layout)
-    pick = lambda role: " ".join(c.strip() for c, r in zip(cells, layout) if r == role and c.strip())  # noqa: E731
-    fields["volunteer"], fields["notes"] = pick("volunteer"), pick("notes")
+    for role in ("volunteer", "notes"):
+        fields[role] = " ".join(c.strip() for c, r in zip(cells, layout, strict=False) if r == role and c.strip())
     return fields
+
+
+def _find_spot(db: Session, book: AddressBook, f: dict, auto_save: bool) -> tuple[tuple[float, float] | None, str]:
+    """Where a new address is, when that can be trusted without a map check. Otherwise None and the reason."""
+    router = get_router()
+    if not auto_save:
+        return None, "Waiting for a map check"
+    if not router.ready:
+        return None, "No map region was loaded during the import"
+    building = same_building(book, f["street"], f["zip"])
+    if building is not None:
+        return (building.lat, building.lon), ""
+    try:
+        found = lookup(db, street=f["street"], city=f["city"], state=f["state"], zip_code=f["zip"])
+    except geo.GeocodeError as exc:
+        return None, str(exc) or "The lookup found nothing"
+    if not found:
+        return None, "The lookup found nothing"
+    best = found[0]
+    if best["confidence"] != "high":
+        return None, best.get("note") or "The lookup was not confident"
+    if not router.on_map(best["lat"], best["lon"]):
+        return None, "Outside the loaded map region"
+    return (best["lat"], best["lon"]), ""
 
 
 def _run_import(rows: list[list[str]], layout: list[str], auto_save: bool) -> None:
     job = _import_job
     db = SessionLocal()
     try:
-        router = get_router()
         volunteers = {d.name.strip().lower(): d for d in db.query(Driver).filter(Driver.kind == VOLUNTEER)}
         book = AddressBook(db)
         for n, cells in enumerate(rows, start=1):
@@ -96,28 +119,7 @@ def _run_import(rows: list[list[str]], layout: list[str], auto_save: bool) -> No
                 job["updated"] += 1
                 db.commit()
                 continue
-            spot, reason = None, ""
-            if not auto_save:
-                reason = "Waiting for a map check"
-            elif not router.ready:
-                reason = "No map region was loaded during the import"
-            else:
-                building = same_building(book, f["street"], f["zip"])
-                if building is not None:
-                    spot = (building.lat, building.lon)
-                else:
-                    try:
-                        found = lookup(db, street=f["street"], city=f["city"], state=f["state"], zip_code=f["zip"])
-                    except geo.GeocodeError as exc:
-                        found, reason = [], str(exc)
-                    if not found:
-                        reason = reason or "The lookup found nothing"
-                    elif found[0]["confidence"] != "high":
-                        reason = found[0].get("note") or "The lookup was not confident"
-                    elif not router.on_map(found[0]["lat"], found[0]["lon"]):
-                        reason = "Outside the loaded map region"
-                    else:
-                        spot = (found[0]["lat"], found[0]["lon"])
+            spot, reason = _find_spot(db, book, f, auto_save)
             if spot is not None:
                 addr = save_address(db, f["street"], f["unit"], f["city"], f["state"], f["zip"], *spot)
                 addr.usual_driver_id = owner.id if owner is not None else addr.usual_driver_id

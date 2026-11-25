@@ -62,7 +62,7 @@ def write_settings(body: SettingsIn, db: Session = Depends(get_db)):
         if body.geocoder not in geo.ALL_PROVIDERS:
             bad("Unknown geocoder")
         set_setting(db, "geocoder", body.geocoder)
-    for name, key in KEY_SETTINGS.items():
+    for key in KEY_SETTINGS.values():
         value = getattr(body, key)
         if value is not None:
             set_setting(db, key, value.strip())
@@ -100,7 +100,7 @@ def region_info():
 def region_catalog():
     base = "https://download.geofabrik.de/north-america/us"
     items = []
-    for code, name in sorted(US_STATES.items(), key=lambda kv: kv[1]):
+    for name in sorted(US_STATES.values()):
         slug = name.lower().replace(" ", "-")
         items.append({"name": name.title(), "url": f"{base}/{slug}-latest.osm.pbf"})
     return items

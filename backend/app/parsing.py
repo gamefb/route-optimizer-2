@@ -35,7 +35,7 @@ _UNIT_WORDS = (
     "APARTMENT", "APT", "UNIT", "SUITE", "STE", "NUMBER", "NO", "RM", "ROOM", "LOT",
     "BLDG", "BUILDING", "FL", "FLOOR", "TRLR", "SPC", "SPACE", "PH",
 )
-_UNIT_RE = re.compile(r"^\s*(#|(%s)\b\.?)" % "|".join(_UNIT_WORDS), re.I)
+_UNIT_RE = re.compile(rf"^\s*(#|({'|'.join(_UNIT_WORDS)})\b\.?)", re.I)
 _ZIP_RE = re.compile(r"^\d{3,5}(-\d{4})?$")
 _STREET_RE = re.compile(r"^\d+[A-Za-z]?(-\d+)?\s+\S+")
 
