@@ -185,6 +185,38 @@ def test_older_database_gains_new_columns(client):
     assert client.get("/api/plans/by-day/2026-02-01").json()["start_time"] == "09:00"
 
 
+def test_older_database_loses_retired_columns(client):
+    """Columns that nothing reads any more are dropped, so their old "required" rule cannot block new rows."""
+    from sqlalchemy import inspect, text
+
+    from app.db import engine, ensure_schema
+
+    alex = make_driver(client, "Alex", at=(0, 0))
+    day(client, "2026-01-05", [alex], houses=[12])
+    plan = client.get("/api/plans/by-day/2026-01-06").json()
+    plan = client.post(f"/api/plans/{plan['id']}/paste", json={"text": paste_text([12]).replace("Grid", "Gridd")}).json()
+    stop = plan["stops"][0]
+    assert stop["match_state"] == "possible"
+    known = stop["candidates"][0]["id"]
+    with engine.begin() as conn:  # the shape the first version left behind
+        conn.execute(text("ALTER TABLE drivers ADD COLUMN default_working BOOLEAN NOT NULL DEFAULT 1"))
+        conn.execute(text("ALTER TABLE plans ADD COLUMN order_modes JSON NOT NULL DEFAULT '{}'"))
+        conn.execute(text("ALTER TABLE plan_stops ADD COLUMN candidate_address_id INTEGER"))
+        conn.execute(text("UPDATE plan_stops SET candidate_address_id = :known, candidate_address_ids = NULL WHERE id = :id"),
+                     {"known": known, "id": stop["id"]})
+    ensure_schema()
+    columns = {table: {c["name"] for c in inspect(engine).get_columns(table)} for table in ("drivers", "plans", "plan_stops")}
+    assert "default_working" not in columns["drivers"]
+    assert "order_modes" not in columns["plans"]
+    assert "candidate_address_id" not in columns["plan_stops"]
+    # The one possible match an old row named is still offered.
+    again = client.get("/api/plans/by-day/2026-01-06").json()["stops"][0]
+    assert [c["id"] for c in again["candidates"]] == [known]
+    # New rows still save.
+    make_driver(client, "Blair", at=(9, 9))
+    assert client.get("/api/plans/by-day/2026-02-01").json()["stops"] == []
+
+
 def test_drag_order_driver_start_time_and_backup_folder(client, tmp_path, monkeypatch):
     alex = make_driver(client, "Alex", at=(0, 0), start_time="07:30")
     blair = make_driver(client, "Blair", at=(9, 9))

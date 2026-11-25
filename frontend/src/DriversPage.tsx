@@ -11,7 +11,7 @@ function blank(count: number): Draft {
   return {
     name: "", kind: "staff", color: COLORS[count % COLORS.length],
     start_label: "", start_lat: null, start_lon: null, end_label: "", end_lat: null, end_lon: null,
-    avoid_highways: false, default_working: true, start_time: "", max_stops: null, max_route_minutes: null,
+    avoid_highways: false, start_time: "", max_stops: null, max_route_minutes: null,
     zip_codes: [], locked: false, zipText: "", sameEnd: true,
   };
 }

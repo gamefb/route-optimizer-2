@@ -49,7 +49,7 @@ export const api = {
   deleteAddress: (id: number) => del<{ ok: boolean }>(`/addresses/${id}`),
 
   planForDay: (day: string) => get<Plan>(`/plans/by-day/${day}`),
-  updatePlan: (id: number, body: Partial<Pick<Plan, "objective" | "working_driver_ids" | "order_modes" | "start_time">>) =>
+  updatePlan: (id: number, body: Partial<Pick<Plan, "objective" | "working_driver_ids" | "start_time">>) =>
     put<Plan>(`/plans/${id}`, body),
   paste: (id: number, text: string, mode: "replace" | "append") => post<Plan>(`/plans/${id}/paste`, { text, mode }),
   setLayout: (id: number, layout: string[]) => post<Plan>(`/plans/${id}/layout`, { layout }),

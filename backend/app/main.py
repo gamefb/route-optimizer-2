@@ -233,7 +233,6 @@ class DriverIn(BaseModel):
     end_lat: float | None = None
     end_lon: float | None = None
     avoid_highways: bool = False
-    default_working: bool = True
     start_time: str | None = None
     max_stops: int | None = None
     max_route_minutes: int | None = None
@@ -246,7 +245,7 @@ def driver_out(d: Driver, usual_count: int = 0) -> dict:
         "id": d.id, "name": d.name, "kind": d.kind, "color": d.color,
         "start_label": d.start_label, "start_lat": d.start_lat, "start_lon": d.start_lon,
         "end_label": d.end_label, "end_lat": d.end_lat, "end_lon": d.end_lon,
-        "avoid_highways": d.avoid_highways, "default_working": d.default_working,
+        "avoid_highways": d.avoid_highways,
         "start_time": d.start_time or "",
         "max_stops": d.max_stops, "max_route_minutes": d.max_route_minutes,
         "zip_codes": d.zip_codes or [], "locked": d.is_locked, "usual_stops": usual_count,
@@ -273,7 +272,7 @@ def _fill_driver(d: Driver, body: DriverIn) -> None:
         d.color = body.color
     d.start_label, d.start_lat, d.start_lon = body.start_label, body.start_lat, body.start_lon
     d.end_label, d.end_lat, d.end_lon = body.end_label, body.end_lat, body.end_lon
-    d.avoid_highways, d.default_working = body.avoid_highways, body.default_working
+    d.avoid_highways = body.avoid_highways
     if body.start_time and not valid_time(body.start_time):
         bad("Start time must look like 09:00")
     d.start_time = body.start_time or None
@@ -419,9 +418,8 @@ def delete_address(address_id: int, db: Session = Depends(get_db)):
 
 def stop_out(s: PlanStop, candidates: dict[int, KnownAddress]) -> dict:
     a = s.address
-    cand = candidates.get(s.candidate_address_id) if s.candidate_address_id else None
-    ids = s.candidate_address_ids or ([s.candidate_address_id] if s.candidate_address_id else [])
-    near = [address_out(candidates[i]) for i in ids if i in candidates] if s.match_state == "possible" else []
+    ids = (s.candidate_address_ids or []) if s.match_state == "possible" else []
+    near = [address_out(candidates[i]) for i in ids if i in candidates]
     return {
         "id": s.id, "seq": s.seq, "street": s.street, "unit": s.unit, "city": s.city,
         "state": s.state, "zip": s.zip, "extras": s.extras or [],
@@ -430,7 +428,7 @@ def stop_out(s: PlanStop, candidates: dict[int, KnownAddress]) -> dict:
         "lat": a.lat if a else None, "lon": a.lon if a else None,
         "usual_driver_id": a.usual_driver_id if a else None,
         "notes": (a.notes or "") if a else "", "eta": s.eta,
-        "candidate": address_out(cand) if cand else None, "candidates": near,
+        "candidates": near,
         "manual_driver_id": s.manual_driver_id, "driver_id": s.driver_id, "label": s.label,
         "covering_for_id": s.covering_for_id, "stop_number": s.stop_number,
         "added_time_s": s.added_time_s, "added_distance_m": s.added_distance_m,
@@ -438,11 +436,11 @@ def stop_out(s: PlanStop, candidates: dict[int, KnownAddress]) -> dict:
 
 
 def plan_out(db: Session, plan: Plan) -> dict:
-    cand_ids = list({i for s in plan.stops for i in ([s.candidate_address_id] + list(s.candidate_address_ids or [])) if i})
+    cand_ids = list({i for s in plan.stops for i in (s.candidate_address_ids or [])})
     candidates = {a.id: a for a in db.query(KnownAddress).filter(KnownAddress.id.in_(cand_ids))} if cand_ids else {}
     return {
         "id": plan.id, "day": plan.day.isoformat(), "objective": plan.objective,
-        "working_driver_ids": plan.working_driver_ids or [], "order_modes": plan.order_modes or {},
+        "working_driver_ids": plan.working_driver_ids or [],
         "layout": plan.layout or [], "stale": plan.stale, "result": plan.result,
         "start_time": plan.start_time or "09:00",
         "undo_label": (plan.undo or {}).get("label") or "",
@@ -482,7 +480,6 @@ def plan_for_day(day: date, db: Session = Depends(get_db)):
         plan = Plan(
             day=day,
             objective=last.objective if last else "time",
-            order_modes=dict(last.order_modes or {}) if last else {},
             working_driver_ids=picked or everyone,
             layout=get_settings(db).get("layout") or [],
             start_time=get_settings(db).get("default_start_time") or "09:00",
@@ -495,7 +492,6 @@ def plan_for_day(day: date, db: Session = Depends(get_db)):
 class PlanIn(BaseModel):
     objective: str | None = None
     working_driver_ids: list[int] | None = None
-    order_modes: dict[str, str] | None = None
     start_time: str | None = None
 
 
@@ -508,12 +504,6 @@ def update_plan(plan_id: int, body: PlanIn, db: Session = Depends(get_db)):
         plan.objective = body.objective
     if body.working_driver_ids is not None:
         plan.working_driver_ids = body.working_driver_ids
-    if body.order_modes is not None:
-        new_modes = {k: ("list" if v == "list" else "optimized") for k, v in body.order_modes.items()}
-        # Choosing an order for a driver replaces any order arranged by hand.
-        changed = {k for k, v in new_modes.items() if (plan.order_modes or {}).get(k) != v}
-        plan.manual_orders = {k: v for k, v in (plan.manual_orders or {}).items() if k not in changed}
-        plan.order_modes = new_modes
     if body.start_time is not None:
         if not valid_time(body.start_time):
             bad("Start time must look like 09:00")
@@ -612,14 +602,6 @@ def change_layout(plan_id: int, body: LayoutIn, db: Session = Depends(get_db)):
     return plan_out(db, plan)
 
 
-@app.post("/api/plans/{plan_id}/remember-layout")
-def remember_layout(plan_id: int, db: Session = Depends(get_db)):
-    plan = get_plan(db, plan_id)
-    set_setting(db, "layout", plan.layout or [])
-    db.commit()
-    return {"ok": True}
-
-
 @app.post("/api/plans/{plan_id}/stops")
 def add_stop(plan_id: int, body: StopIn, db: Session = Depends(get_db)):
     plan = get_plan(db, plan_id)
@@ -693,7 +675,8 @@ class ConfirmMatchIn(BaseModel):
 def confirm_match(stop_id: int, body: ConfirmMatchIn, db: Session = Depends(get_db)):
     """Yes, this row is that known address. Remember the spelling for next time."""
     stop = get_stop(db, stop_id)
-    target = db.get(KnownAddress, body.address_id or stop.candidate_address_id or 0) or bad("Address not found", 404)
+    closest = (stop.candidate_address_ids or [0])[0]
+    target = db.get(KnownAddress, body.address_id or closest) or bad("Address not found", 404)
     key = norm_key(stop.street, stop.unit, stop.zip)
     if key != target.norm_key and key not in (target.aliases or []):
         target.aliases = list(target.aliases or []) + [key]
@@ -707,7 +690,7 @@ def confirm_match(stop_id: int, body: ConfirmMatchIn, db: Session = Depends(get_
 def mark_new(stop_id: int, db: Session = Depends(get_db)):
     stop = get_stop(db, stop_id)
     if stop.match_state == "possible":
-        stop.match_state, stop.candidate_address_id, stop.candidate_address_ids = "new", None, None
+        stop.match_state, stop.candidate_address_ids = "new", None
         db.commit()
     return plan_out(db, stop.plan)
 
@@ -790,11 +773,11 @@ def confirm_location(stop_id: int, body: LocationIn, db: Session = Depends(get_d
 # ------------------------------------------------------- computing the plan
 
 
-def _run(db: Session, plan: Plan, reshuffle: bool = False) -> dict:
+def _run(db: Session, plan: Plan) -> dict:
     try:
         settings = get_settings(db)
         return planner.compute(
-            db, plan, get_router(), reshuffle=reshuffle,
+            db, plan, get_router(),
             staff_balance=settings["staff_balance"], minutes_per_stop=int(settings["minutes_per_stop"] or 0),
         )
     except (planner.PlanError, RoutingError) as exc:
@@ -842,14 +825,6 @@ def undo_last(plan_id: int, db: Session = Depends(get_db)):
         plan.stale = True
     db.commit()
     return plan_out(db, plan)
-
-
-def _recount(result: dict) -> None:
-    for r in result["routes"]:
-        counts = {k: 0 for k in ("usual", "added", "covering", "manual", "staff", "overflow")}
-        for sid in r["stop_ids"]:
-            counts[result["assignments"][str(sid)]["label"]] += 1
-        r["counts"] = counts
 
 
 class MoveIn(BaseModel):
@@ -901,7 +876,6 @@ def make_usual(stop_id: int, db: Session = Depends(get_db)):
     result = copy.deepcopy(plan.result)
     _snapshot(plan, "making a stop usual")
     _make_usual(db, plan, stop, result)
-    _recount(result)
     plan.result = result
     db.commit()
     return plan_out(db, plan)
@@ -917,7 +891,6 @@ def make_all_usual(plan_id: int, body: MoveIn, db: Session = Depends(get_db)):
     for s in plan.stops:
         if s.driver_id == body.driver_id and s.label in ("added", "manual"):
             _make_usual(db, plan, s, result)
-    _recount(result)
     plan.result = result
     db.commit()
     return plan_out(db, plan)
@@ -1205,7 +1178,7 @@ def discard_pending(body: PendingDeleteIn, db: Session = Depends(get_db)):
 # -------------------------------------------------------- backup and restore
 
 DRIVER_FIELDS = ["name", "kind", "color", "start_time", "start_label", "start_lat", "start_lon", "end_label", "end_lat",
-                 "end_lon", "avoid_highways", "default_working", "max_stops", "max_route_minutes", "zip_codes", "locked"]
+                 "end_lon", "avoid_highways", "max_stops", "max_route_minutes", "zip_codes", "locked"]
 ADDRESS_FIELDS = ["street", "unit", "city", "state", "zip", "norm_key", "building_key", "aliases", "lat", "lon", "notes"]
 
 

@@ -47,8 +47,7 @@ function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan
   const [error, setError] = useState("");
   const names = new Map(drivers.map((d) => [d.id, d.name]));
   const byId = useMemo(() => new Map(plan.stops.map((s) => [s.id, s])), [plan.stops]);
-  const stops = r.stop_ids.map((id) => byId.get(id)).filter((s): s is Stop => !!s);
-  const rows = stops; // always in driving order
+  const stops = r.stop_ids.map((id) => byId.get(id)).filter((s): s is Stop => !!s); // in driving order
   const [codes, setCodes] = useState<{ url: string; image: string; label: string }[]>([]);
 
   // Links (and QR codes) that open the route on a phone, in driving order.
@@ -149,7 +148,7 @@ function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan
             <tr><th>Stop</th><th>List #</th><th>Arrive</th><th>Address</th><th>Unit</th><th>City</th><th>Zip</th><th>Note</th><th className="tick">Done</th></tr>
           </thead>
           <tbody>
-            {rows.map((s) => (
+            {stops.map((s) => (
               <tr key={s.id}>
                 <td className="sheet-num">{s.stop_number}</td>
                 <td className="sheet-list">{s.seq}</td>

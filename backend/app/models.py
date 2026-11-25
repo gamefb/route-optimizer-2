@@ -23,7 +23,6 @@ class Driver(Base):
     end_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     end_lon: Mapped[float | None] = mapped_column(Float, nullable=True)
     avoid_highways: Mapped[bool] = mapped_column(Boolean, default=False)
-    default_working: Mapped[bool] = mapped_column(Boolean, default=True)
     start_time: Mapped[str | None] = mapped_column(String(5), nullable=True)  # optional; else the day's time
     # Volunteer-only settings. Ignored for staff.
     max_stops: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -72,7 +71,6 @@ class Plan(Base):
     day: Mapped[date] = mapped_column(Date, unique=True, index=True)
     objective: Mapped[str] = mapped_column(String(12), default="time")  # time | distance
     working_driver_ids: Mapped[list] = mapped_column(JSON, default=list)
-    order_modes: Mapped[dict] = mapped_column(JSON, default=dict)  # {driver_id: optimized|list}
     layout: Mapped[list] = mapped_column(JSON, default=list)  # column roles of the pasted data
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     start_time: Mapped[str | None] = mapped_column(String(5), nullable=True)  # "09:00"; drivers leave at this time
@@ -103,7 +101,6 @@ class PlanStop(Base):
     address_id: Mapped[int | None] = mapped_column(
         ForeignKey("addresses.id", ondelete="SET NULL"), nullable=True
     )
-    candidate_address_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     candidate_address_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)  # every near match, closest first
     is_new_address: Mapped[bool] = mapped_column(Boolean, default=False)
     duplicate_of_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -112,7 +109,7 @@ class PlanStop(Base):
     manual_driver_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Filled in by the planner.
     driver_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    label: Mapped[str] = mapped_column(String(20), default="")  # usual|added|covering|manual|staff
+    label: Mapped[str] = mapped_column(String(20), default="")  # usual|added|covering|manual|staff|overflow
     covering_for_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     stop_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     eta: Mapped[str | None] = mapped_column(String(5), nullable=True)  # estimated arrival, "10:42"

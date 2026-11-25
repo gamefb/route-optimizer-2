@@ -6,7 +6,6 @@ import re
 from difflib import SequenceMatcher
 
 ROLES = ["street", "unit", "city", "state", "zip", "extra"]
-EXPECTED_ORDER = ["street", "unit", "city", "state", "zip"]
 
 US_STATES = {
     "AL": "ALABAMA", "AK": "ALASKA", "AZ": "ARIZONA", "AR": "ARKANSAS", "CA": "CALIFORNIA",

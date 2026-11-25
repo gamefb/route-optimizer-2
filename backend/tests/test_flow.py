@@ -78,7 +78,7 @@ def test_possible_match_and_alias(client):
     plan = client.post(f"/api/plans/{plan['id']}/paste", json={"text": "11 Grid Street\t\tGridville\tOH\t43001\n12 Gridd St\t\tGridville\tOH\t43001\n"}).json()
     states = [s["match_state"] for s in plan["stops"]]
     assert states == ["matched", "possible"]  # "Street" tidies to "St"; "Gridd" is a near miss
-    assert plan["stops"][1]["candidate"]["street"] == "12 Grid St"
+    assert [c["street"] for c in plan["stops"][1]["candidates"]] == ["12 Grid St"]
     plan = client.post(f"/api/stops/{plan['stops'][1]['id']}/confirm-match", json={}).json()
     assert plan["stops"][1]["match_state"] == "matched"
     # the spelling is remembered
@@ -205,14 +205,14 @@ def test_usual_stops_over_the_limit_overflow_to_staff(client):
     assert len(moved) == 2 and all(s["driver_id"] == alex["id"] and s["covering_for_id"] == vera["id"] for s in moved)
 
 
-def test_manual_move_and_list_order_and_csv(client):
+def test_manual_move_and_csv(client):
     alex = make_driver(client, "Alex", at=(0, 0))
     blair = make_driver(client, "Blair", at=(9, 9))
     plan = day(client, "2026-01-05", [alex, blair])
-    plan = client.put(f"/api/plans/{plan['id']}", json={"order_modes": {str(alex["id"]): "list"}, "objective": "distance"}).json()
+    plan = client.put(f"/api/plans/{plan['id']}", json={"objective": "distance"}).json()
     plan = compute(client, plan)
     assert plan["result"]["objective"] == "distance"
-    assert all(r["order_mode"] == "optimized" for r in plan["result"]["routes"])  # always optimized
+    assert all(r["order_mode"] == "optimized" for r in plan["result"]["routes"])
 
     counts = {r["driver_id"]: r["stops"] for r in plan["result"]["routes"]}
     assert max(counts.values()) <= 22 and min(counts.values()) >= 14  # shared roughly evenly

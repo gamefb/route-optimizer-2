@@ -176,7 +176,6 @@ export default function Routes({ plan, drivers, settings, busy, onMove, onMakeUs
                 <Badge kind={r.kind === "volunteer" ? "vol" : "staff"}>{r.kind === "volunteer" ? "Volunteer" : "Staff"}</Badge>
                 {r.locked && <Badge kind="lock">🔒 Locked</Badge>}
                 {r.avoid_highways && <Badge kind="plain">Avoids highways</Badge>}
-                {r.order_mode === "list" && <Badge kind="plain">List order</Badge>}
                 {r.order_mode === "manual" && <Badge kind="info">Arranged by hand</Badge>}
               </div>
               <div className="card-stats">
