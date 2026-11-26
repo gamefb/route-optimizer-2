@@ -1,0 +1,52 @@
+name: Help pages site
+
+# Publishes the guide in docs/ to GitHub Pages.
+# One-time setup in the repository: Settings -> Pages -> Source: "GitHub Actions".
+# A GitHub Pages site is public, even when the repository is private.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - mkdocs.yml
+      - .github/workflows/pages.yml
+  workflow_dispatch: # the "Run workflow" button on the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a publish that is under way finish, and queue only the newest one behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - id: pages
+        uses: actions/configure-pages@v6
+      - run: pip install -r docs/requirements.txt
+      - run: mkdocs build --strict --site-dir _site
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}/
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

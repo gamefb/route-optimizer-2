@@ -7,6 +7,8 @@ COPY docs/requirements.txt docs/requirements.txt
 RUN pip install --no-cache-dir -r docs/requirements.txt
 COPY mkdocs.yml .
 COPY docs docs
+# nginx serves these at /help/ (see mkdocs.yml for why that matters).
+ENV SITE_URL=http://localhost/help/
 RUN mkdocs build --strict --site-dir /site
 
 # The interface.
