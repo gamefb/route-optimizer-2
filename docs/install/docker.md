@@ -1,8 +1,8 @@
-# Run it with Docker
+# Running via Docker
 
 Use this if you already run Docker, or if you want other computers on your network to open the app from one always-on machine. For one person on one computer, [running it directly](local.md) is simpler.
 
-## Start it
+## Starting the app
 
 You need Docker with Docker Compose.
 
@@ -14,9 +14,9 @@ On Windows you can double-click `start.bat` instead, which runs the same command
 
 Then open **http://localhost:8080**, or the computer's name on your network with port 8080.
 
-Carry on with [First-time setup](first-time.md).
+Carry on with [Initial setup](first-time.md).
 
-## Settings in `.env`
+## Configuration
 
 Copy `.env.example` to `.env` and edit it before starting. Every line is optional.
 
@@ -31,7 +31,7 @@ Copy `.env.example` to `.env` and edit it before starting. Every line is optiona
 | `DEFAULT_REGION_NAME`, `DEFAULT_REGION_URL` | A map to load automatically on the first start. You can also do this in Settings. |
 | `GOOGLE_MAPS_API_KEY`, `MAPBOX_ACCESS_TOKEN`, `GEOCODIO_API_KEY` | Keys for a paid address lookup. You can also paste these in Settings. |
 
-## What is inside
+## Services
 
 | Service | What it does |
 |---|---|
@@ -46,3 +46,7 @@ The routing engine is tested on ordinary Intel and AMD processors. On an ARM mac
 ## Updating
 
 Replace the project files and run `docker compose up -d --build` again, or double-click `start.bat`. Your data is kept, and the database is brought up to date when the app starts.
+
+## Uninstalling
+
+See [Uninstalling](uninstall.md).

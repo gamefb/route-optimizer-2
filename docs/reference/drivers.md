@@ -17,11 +17,11 @@ Every driver is one or the other, and the two are treated differently when stops
 | Own start and end locations | Yes | Yes |
 | Own start time | Yes | Yes |
 
-Volunteers are given stops first, up to their limits. Staff take whatever is left. See [How stops are handed out](assignment.md).
+Volunteers are given stops first, up to their limits. Staff take whatever is left. See [Stop assignment](assignment.md).
 
 If you change a volunteer to staff, their usual stops are cleared.
 
-## The driver form
+## Driver form
 
 ![Editing a volunteer](../img/driver-edit.png)
 

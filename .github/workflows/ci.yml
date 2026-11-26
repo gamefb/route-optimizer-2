@@ -99,8 +99,8 @@ jobs:
       - name: The screens and the help pages answer
         run: |
           curl -fsS http://localhost:8080/ | grep -q "<title>Route Planner</title>"
-          curl -fsS http://localhost:8080/help/ | grep -q "A day at a glance"
-          curl -fsS http://localhost:8080/help/daily/paste/ | grep -q "Paste the rows"
+          curl -fsS http://localhost:8080/help/ | grep -q "Daily workflow"
+          curl -fsS http://localhost:8080/help/daily/paste/ | grep -q "Pasting the rows"
           curl -fsS http://localhost:8080/api/settings | grep -q '"units"'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/help/no-such-page/)" = "404"
       - name: Logs, if something failed

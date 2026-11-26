@@ -22,7 +22,7 @@ Under **Settings → Backup** you can see the latest file and press **Back up no
 
 These files sit on the same disk as the app. Copy the folder to another disk or a cloud drive from time to time.
 
-## Backups by hand
+## Manual backups
 
 **Settings → Backup → Download backup** saves a backup file through your browser.
 

@@ -6,7 +6,7 @@ You paste the addresses from Excel. The app matches them to addresses it already
 
 It is an internal tool for one dispatcher. It has no login and is meant to run on your own computer or your own network.
 
-## A day at a glance
+## Daily workflow
 
 1. [Paste](daily/paste.md) the day's rows from Excel.
 2. [Review the table](daily/review.md) and check any new addresses on the map.
@@ -17,11 +17,11 @@ It is an internal tool for one dispatcher. It has no login and is meant to run o
 
 ![The routes for a day: a map beside each driver's list of stops](img/routes.png)
 
-## Where to start
+## Getting started
 
-- **Setting it up for the first time?** Start with [Run it on your computer](install/local.md) (no Docker needed) or [Run it with Docker](install/docker.md), then [First-time setup](install/first-time.md).
-- **Using it day to day?** Follow [A day's routes](daily/paste.md) from step 1.
-- **Wondering why a stop went to a certain driver?** See [How stops are handed out](reference/assignment.md).
+- **Setting it up for the first time?** Start with [Running locally](install/local.md) (no Docker needed) or [Running via Docker](install/docker.md), then [Initial setup](install/first-time.md).
+- **Using it day to day?** Follow the [Daily workflow](daily/paste.md) from step 1.
+- **Wondering why a stop went to a certain driver?** See [Stop assignment](reference/assignment.md).
 - **Something not working?** See [Troubleshooting](reference/troubleshooting.md).
 
 !!! note "About the screenshots"

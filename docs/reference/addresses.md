@@ -4,7 +4,7 @@ The **Addresses** page lists every address the app knows: each one you have conf
 
 ![The Addresses page](../img/addresses.png)
 
-## What you can do here
+## Managing addresses
 
 - **Search** by street, city, zip or note.
 - **Usual volunteer.** Choose the volunteer an address usually goes to, or *None*. A locked volunteer cannot be chosen, and an address belonging to a locked volunteer cannot be changed until the lock is turned off.
@@ -26,7 +26,7 @@ Importing loads an existing list of addresses in one go, with each address's usu
 
 ![The import dialog, with a dropdown over each column](../img/import.png)
 
-### Addresses the lookup is sure about
+### High-confidence addresses
 
 With **Save addresses the lookup is confident about without a map check** ticked, an address is saved straight away when the lookup finds the building itself, in the right zip code, inside your map. A new unit in a building already known is placed at that building.
 

@@ -6,11 +6,11 @@ An internal web app for planning daily shipping routes across staff and voluntee
 
 Each day the dispatcher pastes that day's addresses from Excel. The app matches them to addresses it already knows, has the dispatcher confirm any new ones on a map, hands the stops out (volunteers first, up to their limits, then staff), and produces a route per driver. Results export as a CSV or as printable driver sheets.
 
-## Start it
+## Installation
 
 There are two ways. Both end with the app at **http://localhost:8080**.
 
-### On your own computer, without Docker
+### Running locally
 
 The simplest choice for one person on one computer. You need 64-bit Python 3.12 to 3.14, and Node.js 22 or newer to build the screens.
 
@@ -21,7 +21,7 @@ The first start takes a few minutes while it installs the app's packages and bui
 
 Started this way the app can be opened from this computer only. `python run_local.py --help` lists the options.
 
-### With Docker
+### Running via Docker
 
 You need Docker with Docker Compose.
 
@@ -33,7 +33,7 @@ On Windows, `start.bat` runs the same command. To change the port or database pa
 
 > **There is no login.** Anyone who can reach the app can use and change it. With Docker, other computers on your network can open it unless you set `WEB_BIND=127.0.0.1` in `.env`. Never expose it to the public internet.
 
-## First-time setup
+## Initial setup
 
 1. **Settings → Map region.** Pick the state your drivers cover (or paste a link to any OpenStreetMap `.osm.pbf` extract) and press **Load region**. The app downloads the road data and prepares it. A single state takes a few minutes and a few gigabytes of memory; larger areas take longer and need a bigger machine. Routes cannot be built until a region is ready.
 2. **Drivers.** Add each driver as staff or volunteer, with a start location and (if different) an end location.
@@ -41,7 +41,7 @@ On Windows, `start.bat` runs the same command. To change the port or database pa
    - **Volunteers:** optional maximum stops, maximum route time (driving minutes) and assigned zip codes, plus an optional lock.
 3. **Addresses → Import a list** (optional). Paste your existing address list from Excel, with a column for the usual volunteer's name and a column of notes if you have them. Addresses the lookup is confident about are saved straight away; the rest are set aside for a quick map check. This saves confirming every address one by one on the first day.
 
-## Daily use
+## Daily workflow
 
 1. **Paste.** Copy the rows in Excel and paste them into the Day plan page. One address per row; columns are street address, unit number, city, state, zip; no header row. The app works out which column is which and shows its guess above the table, where you can correct it. The layout is remembered.
 2. **Review.** Each row is marked *Matched*, *Possible match*, *New address* or *Fix this row*. Every cell is editable.
@@ -51,7 +51,7 @@ On Windows, `start.bat` runs the same command. To change the port or database pa
 6. **Adjust.** Move a stop to another driver for the day (drag it onto their list, or use its *Move* menu), drag a stop to a new place in its route (or nudge it with the arrows), add a note to an address, or make a volunteer's extra stop one of their usual stops. **Undo** reverses the last "make usual".
 7. **Export.** Download the CSV (list order, with list order number, driver, stop number, estimated arrival and notes columns), or open the driver sheets (driving order, with each stop's list order number beside it) and print them, save them as PDF, or download each as an image. Each sheet carries QR codes that open the route in Google Maps on a phone.
 
-### How stops are handed out
+### Stop assignment
 
 - A volunteer's **usual stops** go to them whenever they are on the day's list.
 - Volunteers are then **filled to the fullest** their limits allow with other stops in their zip codes. These extras are for that day only and are labeled *Added today*, unless you press **Make usual stop**.
@@ -68,7 +68,7 @@ On Windows, `start.bat` runs the same command. To change the port or database pa
 - A route **arranged by hand** keeps that order when routes are rebuilt, until you press *Back to automatic order*. Rearranging a route recalculates only that route; who has which stop does not change.
 - **Google Maps links** hold at most 10 places each, so a longer route gets several QR codes, each starting where the last one ended.
 
-## What is inside
+## Architecture
 
 | Service | What it does |
 |---|---|
@@ -84,7 +84,7 @@ Two Docker volumes hold everything that matters: `pgdata` (drivers, addresses, p
 
 **Updating.** Replace the project files and run `docker compose up -d --build` again (or double-click `start.bat` on Windows). Your data is kept, and the database is upgraded in place.
 
-### Outside services the app calls
+### External services
 
 | What | Service | Notes |
 |---|---|---|
@@ -135,7 +135,7 @@ The same checks (lint, formatting, tests, build) run on every pull request; see 
 
 **Try it offline.** `cd frontend && npm run build`, then `cd backend && python -m tests.demo_server` and open http://localhost:8000. This runs the full app on a made-up 10 by 10 street grid with a fake address lookup. Addresses look like `37 Grid St` (the number picks the spot). The map background will be blank without internet, but pins and routes are drawn.
 
-## Notes and limits
+## Notes and limitations
 
 - The routing library is tested on x86-64. `docker-compose.yml` pins the `api` service to `linux/amd64`, which runs under emulation on ARM machines.
 - Addresses are assumed to be in the United States (state and 5-digit zip).

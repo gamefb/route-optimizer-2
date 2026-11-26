@@ -1,10 +1,10 @@
-# 3. Drivers and options
+# 3. Selecting drivers and options
 
 Under **Drivers and options** you say who is working today and what the routes should aim for.
 
 ![Drivers and options: who is working, time or miles, and the start time](../img/drivers-options.png)
 
-## Who is working
+## Working drivers
 
 Tick each staff driver and volunteer who should be given stops today. **All** and **None** tick or untick a whole group.
 

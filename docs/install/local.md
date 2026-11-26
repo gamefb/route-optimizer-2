@@ -1,8 +1,8 @@
-# Run it on your computer
+# Running locally
 
 This is the simplest way to run Route Planner for one person on one computer. It does not need Docker. The app runs in a window on your computer and you use it in your browser.
 
-## What you need
+## Requirements
 
 | | |
 |---|---|
@@ -11,7 +11,7 @@ This is the simplest way to run Route Planner for one person on one computer. It
 | **Disk and memory** | Preparing the map for one US state needs a few gigabytes of memory and of disk space. Larger areas need more. |
 | **Internet** | For the first run (to download the app's packages), to download the map, to look up new addresses, and to show the map background. Routes themselves are worked out on your computer. |
 
-## Start it
+## Starting the app
 
 1. Put the project folder somewhere permanent, for example `Documents\route-planner`.
 2. Start the app:
@@ -22,9 +22,9 @@ This is the simplest way to run Route Planner for one person on one computer. It
 
 Leave the window open while you use the app. To stop the app, press `Ctrl+C` in that window or close it.
 
-Then carry on with [First-time setup](first-time.md).
+Then carry on with [Initial setup](first-time.md).
 
-## Where your data is kept
+## Data storage
 
 Everything the app keeps is in the `local-data` folder inside the project folder:
 
@@ -36,11 +36,11 @@ Everything the app keeps is in the `local-data` folder inside the project folder
 
 Copy the `backups` folder somewhere safe from time to time. To move the whole app to another computer, copy the project folder including `local-data`.
 
-## Who can open it
+## Network access
 
 Started this way, the app listens on **this computer only**. Other computers on your network cannot open it. That is deliberate: the app has no login. See [Security and privacy](../reference/security.md) if you need to open it up.
 
-## Options
+## Launch options
 
 Run the launcher from a terminal to change how it starts:
 
@@ -57,7 +57,11 @@ On Windows, `start-local.bat` passes the same options on, for example `start-loc
 
 Replace the project files with the new version, keeping your `local-data` folder, and start it again. The launcher notices what changed and reinstalls or rebuilds only that. The database is brought up to date on start-up and your data is kept.
 
-## What has been tested
+## Uninstalling
+
+See [Uninstalling](uninstall.md).
+
+## Tested platforms
 
 This way of running the app is checked automatically on Linux and on Windows each time the code changes: the launcher installs everything, starts the app and confirms that the app, its screens and these help pages answer. The app's own tests, which build a small map and plan routes on it, also run on both.
 

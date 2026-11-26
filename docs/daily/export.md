@@ -1,8 +1,8 @@
-# 6. Export
+# 6. Exporting
 
 Both exports are at the top right of the **Routes** section.
 
-## Download CSV
+## CSV download
 
 **Download CSV** gives one file for the day, named for the date, that opens in Excel. The rows are in the order you pasted them, so it lines up with your own sheet.
 
@@ -35,7 +35,7 @@ At the top of the tab:
 - **Print or save as PDF** opens your browser's print window. Each driver starts on a new page.
 - **Download image** on a sheet saves that sheet as a picture.
 
-### The QR codes
+### QR codes
 
 Scanning a code with a phone's camera opens the route in the driver's own Google Maps, ready to navigate.
 

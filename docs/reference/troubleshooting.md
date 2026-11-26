@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## Starting the app on your computer
+## Starting the app locally
 
 **"This needs 64-bit Python 3.12, 3.13 or 3.14."**
 Install Python 3.13 from [python.org](https://www.python.org/downloads/) and start the app again. On Windows, tick "Add python.exe to PATH" in the installer.
@@ -17,10 +17,10 @@ The app runs in that window. Leave it open while you work, and start it again wh
 **The screens look the same after an update.**
 Refresh the page with Ctrl+F5 so the browser fetches the new screens.
 
-## The map
+## Map
 
 **"No map region is loaded yet. Routes cannot be built until one is ready."**
-Open **Settings → Map region** and load your region. See [First-time setup](../install/first-time.md#1-load-a-map).
+Open **Settings → Map region** and load your region. See [Initial setup](../install/first-time.md#1-loading-a-map).
 
 **"A map is already being prepared. Wait for it to finish."**
 Only one region can be prepared at a time. Progress is shown on the Settings page.
@@ -34,13 +34,13 @@ The map background could not be loaded: there is no internet connection, or the 
 **"That location is outside the loaded map region."**
 The place is not on your map, so no route can reach it. Check the address or the pin. If the place is real and you deliver there, load a region that covers it.
 
-## The review table
+## Review table
 
 **A row says "Fix this row".**
 The reason is shown beside it: a missing street address, a missing or invalid zip code, or an unknown state. Correct the cell and press Enter.
 
 **Every row is marked wrongly, with the city in the street column and so on.**
-The columns were read in the wrong order. Open **Columns in your paste** above the paste box and set each dropdown. See [Paste the addresses](../daily/paste.md#if-the-columns-are-in-a-different-order).
+The columns were read in the wrong order. Open **Columns in your paste** above the paste box and set each dropdown. See [Entering addresses](../daily/paste.md#custom-column-order).
 
 **"Nothing was found for this address."**
 The lookup could not find it. Correct the spelling in the table, or click the map to place the pin yourself. Another [lookup service](settings.md#address-lookup) may do better with that kind of address.
@@ -69,7 +69,7 @@ You tried to add a stop to a locked volunteer, take one of their usual stops awa
 The list or the drivers changed since the routes were built. Press **Rebuild routes**.
 
 **I moved one stop and others moved as well.**
-Moving a stop rebuilds the day around it. A message lists what else changed. See [Other stops may move too](../daily/adjust.md#other-stops-may-move-too).
+Moving a stop rebuilds the day around it. A message lists what else changed. See [Effects on other stops](../daily/adjust.md#effects-on-other-stops).
 
 **A route came back in the opposite direction after a rebuild.**
 When a loop takes exactly the same time either way round, either may be chosen. To fix the order, arrange the route by hand; it is then kept.
