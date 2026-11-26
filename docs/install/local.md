@@ -57,6 +57,10 @@ On Windows, `start-local.bat` passes the same options on, for example `start-loc
 
 Replace the project files with the new version, keeping your `local-data` folder, and start it again. The launcher notices what changed and reinstalls or rebuilds only that. The database is brought up to date on start-up and your data is kept.
 
+## Removing it
+
+See [Removing it](uninstall.md).
+
 ## What has been tested
 
 This way of running the app is checked automatically on Linux and on Windows each time the code changes: the launcher installs everything, starts the app and confirms that the app, its screens and these help pages answer. The app's own tests, which build a small map and plan routes on it, also run on both.

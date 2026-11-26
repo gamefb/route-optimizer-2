@@ -46,3 +46,7 @@ The routing engine is tested on ordinary Intel and AMD processors. On an ARM mac
 ## Updating
 
 Replace the project files and run `docker compose up -d --build` again, or double-click `start.bat`. Your data is kept, and the database is brought up to date when the app starts.
+
+## Removing it
+
+See [Removing it](uninstall.md).

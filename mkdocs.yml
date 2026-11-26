@@ -28,6 +28,7 @@ nav:
       - Run it with Docker: install/docker.md
       - First-time setup: install/first-time.md
       - Moving between the two: install/moving.md
+      - Removing it: install/uninstall.md
   - A day's routes:
       - 1. Paste the addresses: daily/paste.md
       - 2. Review the table: daily/review.md
