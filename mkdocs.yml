@@ -1,0 +1,42 @@
+site_name: Route Planner
+site_description: How to set up and use Route Planner.
+docs_dir: docs
+theme:
+  name: readthedocs
+  navigation_depth: 3
+  collapse_navigation: false
+  prev_next_buttons_location: bottom
+  highlightjs: false # it would be fetched from a CDN; these pages should work with no internet
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+exclude_docs: |
+  requirements.txt
+validation: # with "mkdocs build --strict", any of these fails the build
+  links:
+    not_found: warn
+    anchors: warn # a link to a heading that does not exist
+    absolute_links: warn
+nav:
+  - Home: index.md
+  - Getting started:
+      - Run it on your computer: install/local.md
+      - Run it with Docker: install/docker.md
+      - First-time setup: install/first-time.md
+      - Moving between the two: install/moving.md
+  - A day's routes:
+      - 1. Paste the addresses: daily/paste.md
+      - 2. Review the table: daily/review.md
+      - 3. Drivers and options: daily/drivers-options.md
+      - 4. Build and read the routes: daily/routes.md
+      - 5. Adjust the routes: daily/adjust.md
+      - 6. Export: daily/export.md
+  - Reference:
+      - Drivers: reference/drivers.md
+      - How stops are handed out: reference/assignment.md
+      - Addresses and import: reference/addresses.md
+      - Settings: reference/settings.md
+      - Backup and restore: reference/backup.md
+      - Security and privacy: reference/security.md
+      - Troubleshooting: reference/troubleshooting.md
