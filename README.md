@@ -1,10 +1,10 @@
 # Route Planner
 
+**[Read the guide](docs/index.md)** for setup and day-to-day use. In the running app, the same pages open from **Help** in the top bar.
+
 An internal web app for planning daily shipping routes across staff and volunteer drivers.
 
 Each day the dispatcher pastes that day's addresses from Excel. The app matches them to addresses it already knows, has the dispatcher confirm any new ones on a map, hands the stops out (volunteers first, up to their limits, then staff), and produces a route per driver. Results export as a CSV or as printable driver sheets.
-
-**The full guide is in the app:** the **Help** link in the top bar opens it. Its pages are also in the `docs` folder.
 
 ## Start it
 
