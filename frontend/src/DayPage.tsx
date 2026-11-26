@@ -3,10 +3,12 @@ import { api } from "./api";
 import ReviewTable from "./ReviewTable";
 import Routes from "./Routes";
 import type { Driver, Plan, RegionInfo, Settings, Stop } from "./types";
-import { Badge, ErrorNote, Fold } from "./ui";
+import { Badge, ErrorNote, ErrorToast, Fold, Toast } from "./ui";
 import { errorText, useAction } from "./useAction";
-import { clock, longDate, shiftDay, today } from "./util";
+import { addressLine, clock, DriverChange, driverChanges, longDate, shiftDay, today } from "./util";
 import ValidateDialog from "./ValidateDialog";
+
+const MOVES_LISTED = 6; // how many "also changed" stops are named before "and N more"
 
 const ROLE_NAMES: Record<string, string> = {
   street: "Street address",
@@ -33,10 +35,12 @@ export default function DayPage({ day, setDay, settings, drivers, region, reload
   const [showPaste, setShowPaste] = useState(false);
   const [validating, setValidating] = useState<number | null>(null);
   const [skipped, setSkipped] = useState<number[]>([]);
+  const [alsoMoved, setAlsoMoved] = useState<DriverChange[]>([]); // what else the last move changed
 
   useEffect(() => {
     setPlan(null);
     setError("");
+    setAlsoMoved([]);
     setValidating(null);
     api
       .planForDay(day)
@@ -48,6 +52,7 @@ export default function DayPage({ day, setDay, settings, drivers, region, reload
   const run = useCallback(
     (fn: () => Promise<Plan>) =>
       act(async () => {
+        setAlsoMoved([]);
         const next = await fn();
         setPlan(next);
         return next;
@@ -110,6 +115,9 @@ export default function DayPage({ day, setDay, settings, drivers, region, reload
     await run(() => api.updatePlan(p.id, { working_driver_ids: ids }));
   }
 
+  const driverName = (id: number | null) =>
+    id === null ? "not on a route" : drivers.find((d) => d.id === id)?.name || "another driver";
+
   const mapMissing = region !== null && !region.ready;
   const layout = p.layout.length ? p.layout : ["street", "unit", "city", "state", "zip"];
   const sample = p.sample;
@@ -124,7 +132,23 @@ export default function DayPage({ day, setDay, settings, drivers, region, reload
           Routes cannot be built until one is ready. <a href="#/settings">Open Settings</a>
         </div>
       )}
-      <ErrorNote message={error} />
+      <ErrorToast message={error} onClose={() => setError("")} />
+      {alsoMoved.length > 0 && (
+        <Toast kind="info" onClose={() => setAlsoMoved([])}>
+          <b>
+            That move also changed {alsoMoved.length} other stop{alsoMoved.length === 1 ? "" : "s"}.
+          </b>{" "}
+          The routes were rebuilt around it.
+          <ul>
+            {alsoMoved.slice(0, MOVES_LISTED).map(({ stop, from, to }) => (
+              <li key={stop.id}>
+                {addressLine(stop)}: {driverName(from)} → {driverName(to)}
+              </li>
+            ))}
+            {alsoMoved.length > MOVES_LISTED && <li>and {alsoMoved.length - MOVES_LISTED} more</li>}
+          </ul>
+        </Toast>
+      )}
 
       <Fold
         id="paste"
@@ -471,7 +495,11 @@ export default function DayPage({ day, setDay, settings, drivers, region, reload
                 await run(() => api.planForDay(day));
               }
             }}
-            onMove={(s: Stop, driverId) => run(() => api.moveStop(s.id, driverId))}
+            onMove={async (s: Stop, driverId) => {
+              // Moving one stop rebuilds the day, which can shift others. Say so rather than leave it to be noticed.
+              const next = await run(() => api.moveStop(s.id, driverId));
+              if (next) setAlsoMoved(driverChanges(p, next, s.id));
+            }}
             onMakeUsual={async (s) => {
               await run(() => api.makeUsual(s.id));
               reloadDrivers();
