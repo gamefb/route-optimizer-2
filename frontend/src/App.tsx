@@ -103,6 +103,9 @@ export default function App() {
           {tab("drivers", "Drivers", "#/drivers")}
           {tab("addresses", "Addresses", "#/addresses")}
           {tab("settings", "Settings", "#/settings")}
+          <a className="tab" href="/help/" target="_blank" rel="noreferrer">
+            Help
+          </a>
         </nav>
         <div className="top-status">
           {region && (region.ready ? `Map: ${region.name}` : preparing ? "Preparing map…" : "No map loaded")}

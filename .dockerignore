@@ -1,0 +1,14 @@
+# For the web image, whose build context is the project folder. Keep the context small.
+.git
+.github
+.venv
+.local-build
+local-data
+backups
+site
+backend
+**/node_modules
+**/dist
+**/__pycache__
+*.md
+!docs/**/*.md

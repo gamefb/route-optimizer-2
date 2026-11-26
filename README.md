@@ -4,7 +4,24 @@ An internal web app for planning daily shipping routes across staff and voluntee
 
 Each day the dispatcher pastes that day's addresses from Excel. The app matches them to addresses it already knows, has the dispatcher confirm any new ones on a map, hands the stops out (volunteers first, up to their limits, then staff), and produces a route per driver. Results export as a CSV or as printable driver sheets.
 
+**The full guide is in the app:** the **Help** link in the top bar opens it. Its pages are also in the `docs` folder.
+
 ## Start it
+
+There are two ways. Both end with the app at **http://localhost:8080**.
+
+### On your own computer, without Docker
+
+The simplest choice for one person on one computer. You need 64-bit Python 3.12 to 3.14, and Node.js 22 or newer to build the screens.
+
+- **Windows:** double-click `start-local.bat`
+- **Linux:** `./start-local.sh`
+
+The first start takes a few minutes while it installs the app's packages and builds the screens. Leave the window open while you use the app. Everything it keeps (the database, the map, daily backups) is in the `local-data` folder.
+
+Started this way the app can be opened from this computer only. `python run_local.py --help` lists the options.
+
+### With Docker
 
 You need Docker with Docker Compose.
 
@@ -12,11 +29,9 @@ You need Docker with Docker Compose.
 docker compose up -d --build
 ```
 
-Then open **http://localhost:8080** (or the server's name on your network, port 8080).
+On Windows, `start.bat` runs the same command. To change the port or database password, copy `.env.example` to `.env` and edit it first.
 
-To change the port or database password, copy `.env.example` to `.env` and edit it first.
-
-> **There is no login.** Anyone who can reach the app can use and change it. Keep it on your internal network and do not expose the port to the public internet.
+> **There is no login.** Anyone who can reach the app can use and change it. With Docker, other computers on your network can open it unless you set `WEB_BIND=127.0.0.1` in `.env`. Never expose it to the public internet.
 
 ## First-time setup
 
@@ -57,7 +72,7 @@ To change the port or database password, copy `.env.example` to `.env` and edit 
 
 | Service | What it does |
 |---|---|
-| `web` | The interface (React), served by nginx. |
+| `web` | The interface (React) and the help pages, served by nginx. |
 | `api` | Python (FastAPI). Holds the data and the planning logic. Runs the Valhalla routing engine and the VROOM optimizer in-process. |
 | `db` | Postgres. |
 
@@ -95,6 +110,10 @@ cd frontend
 npm install
 npm run dev                           # http://localhost:5173, forwards /api to localhost:8000
 npm run lint && npm run format        # lint, then format
+
+# Help pages (the docs folder)
+pip install -r docs/requirements.txt
+mkdocs serve                          # http://localhost:8000 with live reload; "mkdocs build --strict" checks every link
 ```
 
 The same checks (lint, formatting, tests, build) run on every pull request; see `.github/workflows/ci.yml`.
@@ -108,6 +127,8 @@ The same checks (lint, formatting, tests, build) run on every pull request; see 
 | `backend/app/optimizer.py`, `routing.py` | The VROOM optimizer and the Valhalla routing engine. |
 | `backend/app/matching.py`, `parsing.py` | Reading pasted rows and matching them to known addresses. |
 | `backend/app/db.py`, `models.py` | The database tables, and the in-place upgrade run at start-up. |
+| `docs/`, `mkdocs.yml` | The help pages, built into the app at `/help/`. |
+| `run_local.py` | Runs the app without Docker: sets up Python packages, builds the screens and help pages, and serves everything from one process. |
 | `frontend/src/` | One file per page (`DayPage`, `DriversPage`, `AddressesPage`, `SettingsPage`, `PrintPage`), with shared pieces in `ui.tsx`, `useAction.ts`, `routePins.ts` and `util.ts`. |
 
 **Try it offline.** `cd frontend && npm run build`, then `cd backend && python -m tests.demo_server` and open http://localhost:8000. This runs the full app on a made-up 10 by 10 street grid with a fake address lookup. Addresses look like `37 Grid St` (the number picks the spot). The map background will be blank without internet, but pins and routes are drawn.

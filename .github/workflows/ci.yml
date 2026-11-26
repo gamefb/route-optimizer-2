@@ -7,7 +7,13 @@ on:
 
 jobs:
   backend:
-    runs-on: ubuntu-latest
+    # The tests build a small made-up street grid and run the real routing engine and optimizer on it.
+    # They run on Windows too, because the app can be run there without Docker.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: backend
@@ -20,10 +26,11 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r requirements-dev.txt
       - name: Lint
+        if: matrix.os == 'ubuntu-latest'
         run: ruff check .
       - name: Formatting
+        if: matrix.os == 'ubuntu-latest'
         run: ruff format --check .
-      # Builds a small made-up street grid and runs the real routing engine and optimizer on it.
       - name: Tests
         run: python -m pytest
 
@@ -46,3 +53,56 @@ jobs:
         run: npm run format:check
       - name: Type check and build
         run: npm run build
+
+  help-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install -r docs/requirements.txt
+      # --strict fails on a link to a page or heading that does not exist.
+      - run: mkdocs build --strict
+
+  run-without-docker:
+    # The launcher sets everything up from nothing, starts the app, and confirms
+    # that the app, its screens and the help pages answer.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: python run_local.py --check
+
+  docker:
+    # Builds the images and starts the stack the way start.bat does, then asks it for each kind of page.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose up -d --build
+      - name: Wait for the app
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/api/health; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: The screens and the help pages answer
+        run: |
+          curl -fsS http://localhost:8080/ | grep -q "<title>Route Planner</title>"
+          curl -fsS http://localhost:8080/help/ | grep -q "A day at a glance"
+          curl -fsS http://localhost:8080/help/daily/paste/ | grep -q "Paste the rows"
+          curl -fsS http://localhost:8080/api/settings | grep -q '"units"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/help/no-such-page/)" = "404"
+      - name: Logs, if something failed
+        if: failure()
+        run: docker compose logs --tail 100
