@@ -1,5 +1,8 @@
 site_name: Route Planner
 site_description: How to set up and use Route Planner.
+# Where the built pages will live. It only matters for the "page not found" page, which has to load its
+# styles from the right place: /help/ inside the app, the project's address on GitHub Pages.
+site_url: !ENV SITE_URL
 docs_dir: docs
 theme:
   name: readthedocs

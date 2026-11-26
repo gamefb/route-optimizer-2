@@ -1,6 +1,6 @@
 # Route Planner
 
-**[Read the guide](docs/index.md)** for setup and day-to-day use. In the running app, the same pages open from **Help** in the top bar.
+**[Read the guide](https://gamefb.github.io/route-optimizer-2/)** for setup and day-to-day use. In the running app, the same pages open from **Help** in the top bar, and their sources are in [`docs/`](docs/index.md).
 
 An internal web app for planning daily shipping routes across staff and volunteer drivers.
 
@@ -115,6 +115,8 @@ npm run lint && npm run format        # lint, then format
 pip install -r docs/requirements.txt
 mkdocs serve                          # http://localhost:8000 with live reload; "mkdocs build --strict" checks every link
 ```
+
+The guide is also published to GitHub Pages by `.github/workflows/pages.yml`, each time a change to `docs/` or `mkdocs.yml` reaches `main`. That needs **Settings → Pages → Source** set to **GitHub Actions** in the repository, once.
 
 The same checks (lint, formatting, tests, build) run on every pull request; see `.github/workflows/ci.yml`.
 

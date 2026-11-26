@@ -50,9 +50,9 @@ def stop(message: str) -> None:
     sys.exit(f"\n[route planner] {message}\n")
 
 
-def run(command: list[str], cwd: Path, what: str) -> None:
+def run(command: list[str], cwd: Path, what: str, **settings: str) -> None:
     say(what)
-    if subprocess.run(command, cwd=cwd).returncode != 0:
+    if subprocess.run(command, cwd=cwd, env={**os.environ, **settings}).returncode != 0:
         stop(f"That step failed: {what}\nThe messages above say why. Fix that and run this again.")
 
 
@@ -128,7 +128,7 @@ def build_help() -> None:
     if (HELP_SITE / "index.html").exists() and not stale("help", mark):
         return
     command = [str(PYTHON), "-m", "mkdocs", "build", "--quiet", "--clean", "--site-dir", str(HELP_SITE)]
-    run(command, ROOT, "Building the help pages")
+    run(command, ROOT, "Building the help pages", SITE_URL="http://localhost/help/")  # the app serves them at /help/
     done("help", mark)
 
 
