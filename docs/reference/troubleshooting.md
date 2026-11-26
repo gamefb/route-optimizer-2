@@ -59,6 +59,9 @@ Set a start location for at least one of today's drivers on the **Drivers** page
 **A driver is missing from the routes.**
 A line above the map says a driver "has no start and end location and was left out". Set one on the Drivers page and rebuild.
 
+**"… is locked, so a move made by hand was not followed."**
+A stop was moved onto that volunteer, or one of their usual stops was moved away, before their lock was turned on. A locked volunteer drives exactly their usual stops, so the move is set aside. Turn the lock off on the Drivers page and rebuild if you want the move back.
+
 **"… stop(s) are not on any route."**
 No staff driver is working, and the volunteers could not take those stops within their limits. Each stop shows its reason. Tick a staff driver, raise a limit, or move the stops by hand.
 

@@ -183,20 +183,35 @@ class _Ties:
 
 
 def _tie_stops(day: _Day) -> _Ties:
-    """Before any optimizing: a stop moved by hand goes where it was sent, a usual stop to its volunteer."""
+    """Before any optimizing: a stop moved by hand goes where it was sent, a usual stop to its volunteer.
+
+    A locked volunteer drives exactly their usual stops. A move by hand that says otherwise (it can only
+    have been made before the lock was turned on) is set aside for as long as the lock is on.
+    """
     ties = _Ties()
-    working = {d.id for d in day.drivers}
+    working = {d.id: d for d in day.drivers}
+    set_aside: dict[int, int] = {}  # locked volunteer id -> hand moves not followed
     for s in day.stops.values():
         usual = day.all_drivers.get(s.address.usual_driver_id) if s.address.usual_driver_id else None
         if usual is not None and not usual.is_volunteer:
             usual = None
-        if s.manual_driver_id in working:
-            ties.pinned[s.id], ties.reason[s.id] = s.manual_driver_id, "manual"
+        sent_to = working.get(s.manual_driver_id)
+        if sent_to is not None and (usual is None or usual.id != sent_to.id):
+            keeper = usual if usual is not None and usual.id in working and usual.is_locked else None
+            blocked_by = keeper or (sent_to if sent_to.is_locked else None)
+            if blocked_by is not None:
+                set_aside[blocked_by.id] = set_aside.get(blocked_by.id, 0) + 1
+                sent_to = None
+        if sent_to is not None:
+            ties.pinned[s.id], ties.reason[s.id] = sent_to.id, "manual"
         elif usual is not None:
             if usual.id in working:
                 ties.pinned[s.id], ties.reason[s.id] = usual.id, "usual"
             else:
                 ties.covering[s.id] = usual.id
+    for driver_id, n in set_aside.items():
+        moves = "a move made by hand was" if n == 1 else f"{n} moves made by hand were"
+        day.warnings.append(f"{working[driver_id].name} is locked, so {moves} not followed.")
     return ties
 
 

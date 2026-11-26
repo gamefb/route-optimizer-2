@@ -31,7 +31,7 @@ Each driver's stops are then put in the order that gives the least driving time 
 
 **A volunteer's usual stops do not fit their limits.** The ones that do not fit go to other drivers for the day and are labeled *Over* their name *'s limit*. For a locked volunteer nothing is moved; their route is flagged as over the limit instead.
 
-**You moved a stop.** A stop you moved goes to the driver you chose, for today. If that takes a volunteer over a limit, the move stands and the route is flagged.
+**You moved a stop.** A stop you moved goes to the driver you chose, for today. If that takes a volunteer over a limit, the move stands and the route is flagged. The one exception is a [locked](drivers.md#lock) volunteer: a move made before the lock was turned on is not followed while the lock is on.
 
 **No staff driver is working.** Stops the volunteers cannot take are listed as not on any route, each with the reason.
 
