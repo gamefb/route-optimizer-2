@@ -333,3 +333,34 @@ def test_staff_sharing_can_be_turned_off(client):
     assert client.put("/api/settings", json={"staff_balance": "off"}).json()["staff_balance"] == "off"
     free = compute(client, plan)["result"]["totals"]["time_s"]
     assert free <= shared  # without sharing only the total matters
+
+
+def test_locking_undoes_earlier_hand_moves(client):
+    """A lock turned on after stops were moved by hand still means exactly the usual stops."""
+    alex = make_driver(client, "Alex", at=(0, 0))
+    vera = make_driver(client, "Vera", "volunteer", at=(2, 2), max_stops=5)
+    plan = compute(client, day(client, "2026-01-05", [alex, vera]))
+    plan = client.post(f"/api/plans/{plan['id']}/make-all-usual", json={"driver_id": vera["id"]}).json()
+    usual = [s for s in plan["stops"] if s["driver_id"] == vera["id"]]
+    assert len(usual) == 5
+
+    # While she is unlocked: one of her usual stops is moved to Alex, and one of his is moved onto her.
+    away, extra = usual[0], next(s for s in plan["stops"] if s["driver_id"] == alex["id"])
+    assert client.post(f"/api/stops/{away['id']}/move", json={"driver_id": alex["id"]}).status_code == 200
+    plan = client.post(f"/api/stops/{extra['id']}/move", json={"driver_id": vera["id"]}).json()
+    hers = {s["id"] for s in plan["stops"] if s["driver_id"] == vera["id"]}
+    assert extra["id"] in hers and away["id"] not in hers
+
+    assert client.put(f"/api/drivers/{vera['id']}", json={**vera, "locked": True}).status_code == 200
+    plan = compute(client, plan)
+    hers = [s for s in plan["stops"] if s["driver_id"] == vera["id"]]
+    assert {s["id"] for s in hers} == {s["id"] for s in usual}
+    assert all(s["label"] == "usual" for s in hers)
+    assert next(s for s in plan["stops"] if s["id"] == extra["id"])["driver_id"] == alex["id"]
+    assert any("Vera" in w and "locked" in w for w in plan["result"]["warnings"])
+
+    # Unlocked again, the hand moves count once more.
+    assert client.put(f"/api/drivers/{vera['id']}", json={**vera, "locked": False}).status_code == 200
+    plan = compute(client, plan)
+    hers = {s["id"] for s in plan["stops"] if s["driver_id"] == vera["id"]}
+    assert extra["id"] in hers and away["id"] not in hers

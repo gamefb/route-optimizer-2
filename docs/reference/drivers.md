@@ -64,6 +64,8 @@ A volunteer with **no limits at all** is treated like staff when the leftover st
 
 The order of their route can still be changed. If a locked volunteer is off for the day, their stops are covered by others for that day and remain theirs.
 
+This holds even when the volunteer could take more within their limits, and even for stops moved by hand before the lock was turned on. While the lock is on, a stop that had been moved onto the volunteer goes to another driver, and a usual stop that had been moved away comes back. A line above the routes says how many moves were not followed. Turn the lock off and rebuild, and those moves apply again.
+
 ## Usual stops
 
 The **Usual stops** column shows how many addresses usually go to each volunteer. Click the number to see them on the Addresses page.
