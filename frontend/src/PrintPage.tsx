@@ -2,9 +2,11 @@ import { toPng } from "html-to-image";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
-import MapView, { MapLine, MapMarker } from "./MapView";
+import MapView, { MapLine } from "./MapView";
+import { routePins } from "./routePins";
 import type { Driver, Plan, RouteResult, Settings, Stop } from "./types";
 import { ErrorNote } from "./ui";
+import { errorText } from "./useAction";
 import { clock, decodeShape, formatDistance, formatDuration, googleMapsLinks, longDate } from "./util";
 
 /** Printable driver sheets: one page per driver with a numbered map and the stop list. */
@@ -14,12 +16,25 @@ export default function PrintPage({ day, settings, drivers }: { day: string; set
   const [only, setOnly] = useState<number | "all">("all");
 
   useEffect(() => {
-    api.planForDay(day).then(setPlan).catch((e) => setError((e as Error).message));
+    api
+      .planForDay(day)
+      .then(setPlan)
+      .catch((e) => setError(errorText(e)));
   }, [day]);
 
-  if (error) return <div className="page"><ErrorNote message={error} /></div>;
+  if (error)
+    return (
+      <div className="page">
+        <ErrorNote message={error} />
+      </div>
+    );
   if (!plan) return <div className="page muted">Loading…</div>;
-  if (!plan.result) return <div className="page"><div className="note note-warn">Build the routes for this day first.</div></div>;
+  if (!plan.result)
+    return (
+      <div className="page">
+        <div className="note note-warn">Build the routes for this day first.</div>
+      </div>
+    );
 
   const routes = plan.result.routes.filter((r) => r.stops > 0 && (only === "all" || only === r.driver_id));
   return (
@@ -28,9 +43,17 @@ export default function PrintPage({ day, settings, drivers }: { day: string; set
         <b>Driver sheets for {longDate(day)}</b>
         <select value={only} onChange={(e) => setOnly(e.target.value === "all" ? "all" : Number(e.target.value))}>
           <option value="all">All drivers</option>
-          {plan.result.routes.filter((r) => r.stops > 0).map((r) => <option key={r.driver_id} value={r.driver_id}>{r.name}</option>)}
+          {plan.result.routes
+            .filter((r) => r.stops > 0)
+            .map((r) => (
+              <option key={r.driver_id} value={r.driver_id}>
+                {r.name}
+              </option>
+            ))}
         </select>
-        <button className="btn btn-primary" onClick={() => window.print()}>Print or save as PDF</button>
+        <button className="btn btn-primary" onClick={() => window.print()}>
+          Print or save as PDF
+        </button>
         <span className="muted">Use "Download image" on a sheet for a picture file.</span>
       </div>
       {routes.map((r) => (
@@ -41,14 +64,23 @@ export default function PrintPage({ day, settings, drivers }: { day: string; set
   );
 }
 
-function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan: Plan; settings: Settings; drivers: Driver[] }) {
+function Sheet({
+  route: r,
+  plan,
+  settings,
+  drivers,
+}: {
+  route: RouteResult;
+  plan: Plan;
+  settings: Settings;
+  drivers: Driver[];
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const names = new Map(drivers.map((d) => [d.id, d.name]));
   const byId = useMemo(() => new Map(plan.stops.map((s) => [s.id, s])), [plan.stops]);
-  const stops = r.stop_ids.map((id) => byId.get(id)).filter((s): s is Stop => !!s);
-  const rows = stops; // always in driving order
+  const stops = r.stop_ids.map((id) => byId.get(id)).filter((s): s is Stop => !!s); // in driving order
   const [codes, setCodes] = useState<{ url: string; image: string; label: string }[]>([]);
 
   // Links (and QR codes) that open the route on a phone, in driving order.
@@ -60,40 +92,31 @@ function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan
     Promise.all(links.map((url) => QRCode.toDataURL(url, { margin: 1, width: 220, errorCorrectionLevel: "L" })))
       .then((images) => {
         if (!live) return;
-        setCodes(links.map((url, i) => {
-          // Part i runs from point i*9 to point i*9+9, where point 0 is the start and the last point is the end.
-          const first = i * 9 + 1;
-          const lastPoint = Math.min(i * 9 + 9, located.length + 1);
-          const reachesEnd = lastPoint === located.length + 1;
-          const last = Math.min(lastPoint, located.length);
-          const label = first > located.length ? "Back to the end point"
-            : `Stops ${first}-${last}${reachesEnd ? " and the end point" : ""}`;
-          return { url, image: images[i], label: links.length === 1 ? "Whole route" : label };
-        }));
+        setCodes(
+          links.map((url, i) => {
+            // Part i runs from point i*9 to point i*9+9, where point 0 is the start and the last point is the end.
+            const first = i * 9 + 1;
+            const lastPoint = Math.min(i * 9 + 9, located.length + 1);
+            const reachesEnd = lastPoint === located.length + 1;
+            const last = Math.min(lastPoint, located.length);
+            const label =
+              first > located.length
+                ? "Back to the end point"
+                : `Stops ${first}-${last}${reachesEnd ? " and the end point" : ""}`;
+            return { url, image: images[i], label: links.length === 1 ? "Whole route" : label };
+          }),
+        );
       })
       .catch(() => live && setCodes([]));
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r, plan.stops]);
 
   const { markers, lines } = useMemo(() => {
     const lines: MapLine[] = r.shapes.map((s) => ({ points: decodeShape(s), color: "#111827" }));
-    const markers: MapMarker[] = [{ lat: r.start[0], lon: r.start[1], color: "#111827", shape: "square", text: "S" }];
-    if (r.end[0] !== r.start[0] || r.end[1] !== r.start[1]) {
-      markers.push({ lat: r.end[0], lon: r.end[1], color: "#111827", shape: "square", text: "E" });
-    }
-    const groups = new Map<string, number[]>();
-    for (const s of stops) {
-      if (s.lat === null || s.lon === null) continue;
-      const key = `${s.lat},${s.lon}`;
-      groups.set(key, [...(groups.get(key) || []), s.stop_number || 0]);
-    }
-    for (const [key, nums] of groups) {
-      const [lat, lon] = key.split(",").map(Number);
-      nums.sort((a, b) => a - b);
-      markers.push({ lat, lon, color: "#111827", text: nums.length > 1 ? `${nums[0]}-${nums[nums.length - 1]}` : String(nums[0]) });
-    }
-    return { markers, lines };
+    return { markers: routePins(r, stops, "#111827"), lines };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r, plan.stops]);
 
@@ -127,7 +150,9 @@ function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan
   return (
     <div className="sheet-wrap">
       <div className="no-print sheet-tools">
-        <button className="btn btn-small" disabled={saving} onClick={download}>{saving ? "Working…" : "Download image"}</button>
+        <button className="btn btn-small" disabled={saving} onClick={download}>
+          {saving ? "Working…" : "Download image"}
+        </button>
         {error && <span className="bad-text">{error}</span>}
       </div>
       <div className="sheet" ref={ref}>
@@ -137,25 +162,56 @@ function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan
             <div>{longDate(plan.day)}</div>
           </div>
           <div className="sheet-stats">
-            <div><b>{r.stops}</b> stops</div>
-            <div><b>{formatDuration(r.time_s)}</b> driving</div>
-            <div><b>{formatDistance(r.distance_m, settings.units)}</b></div>
-            <div>Leave <b>{clock(r.start_time)}</b>, done about <b>{clock(r.finish_time)}</b></div>
+            <div>
+              <b>{r.stops}</b> stops
+            </div>
+            <div>
+              <b>{formatDuration(r.time_s)}</b> driving
+            </div>
+            <div>
+              <b>{formatDistance(r.distance_m, settings.units)}</b>
+            </div>
+            <div>
+              Leave <b>{clock(r.start_time)}</b>, done about <b>{clock(r.finish_time)}</b>
+            </div>
           </div>
         </div>
-        <MapView tileUrl={settings.tile_url} markers={markers} lines={lines} height={380} fitKey={`${r.driver_id}:${plan.result?.computed_at}`} interactive={false} />
+        <MapView
+          tileUrl={settings.tile_url}
+          markers={markers}
+          lines={lines}
+          height={380}
+          fitKey={`${r.driver_id}:${plan.result?.computed_at}`}
+          interactive={false}
+        />
         <table className="sheet-table">
           <thead>
-            <tr><th>Stop</th><th>List #</th><th>Arrive</th><th>Address</th><th>Unit</th><th>City</th><th>Zip</th><th>Note</th><th className="tick">Done</th></tr>
+            <tr>
+              <th>Stop</th>
+              <th>List #</th>
+              <th>Arrive</th>
+              <th>Address</th>
+              <th>Unit</th>
+              <th>City</th>
+              <th>Zip</th>
+              <th>Note</th>
+              <th className="tick">Done</th>
+            </tr>
           </thead>
           <tbody>
-            {rows.map((s) => (
+            {stops.map((s) => (
               <tr key={s.id}>
                 <td className="sheet-num">{s.stop_number}</td>
                 <td className="sheet-list">{s.seq}</td>
                 <td className="sheet-eta">{s.eta ? clock(s.eta) : ""}</td>
-                <td>{s.street}</td><td>{s.unit}</td><td>{s.city}</td><td>{s.zip}</td>
-                <td>{note(s)}</td><td className="tick"><span className="box" /></td>
+                <td>{s.street}</td>
+                <td>{s.unit}</td>
+                <td>{s.city}</td>
+                <td>{s.zip}</td>
+                <td>{note(s)}</td>
+                <td className="tick">
+                  <span className="box" />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -167,7 +223,10 @@ function Sheet({ route: r, plan, settings, drivers }: { route: RouteResult; plan
               {codes.map((c, i) => (
                 <a key={i} className="sheet-code" href={c.url} target="_blank" rel="noreferrer">
                   <img src={c.image} alt={`QR code: ${c.label}`} width={110} height={110} />
-                  <span>{codes.length > 1 ? `Part ${i + 1}: ` : ""}{c.label}</span>
+                  <span>
+                    {codes.length > 1 ? `Part ${i + 1}: ` : ""}
+                    {c.label}
+                  </span>
                 </a>
               ))}
             </div>

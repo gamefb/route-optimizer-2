@@ -43,7 +43,16 @@ function icon(m: MapMarker): L.DivIcon {
   });
 }
 
-export default function MapView({ tileUrl, markers = [], lines = [], height = 360, fitKey, panTo, onClick, interactive = true }: Props) {
+export default function MapView({
+  tileUrl,
+  markers = [],
+  lines = [],
+  height = 360,
+  fitKey,
+  panTo,
+  onClick,
+  interactive = true,
+}: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -53,11 +62,17 @@ export default function MapView({ tileUrl, markers = [], lines = [], height = 36
   useEffect(() => {
     if (!holder.current || map.current) return;
     const m = L.map(holder.current, {
-      zoomControl: interactive, dragging: interactive, scrollWheelZoom: interactive,
-      doubleClickZoom: interactive, boxZoom: interactive, keyboard: interactive, touchZoom: interactive,
+      zoomControl: interactive,
+      dragging: interactive,
+      scrollWheelZoom: interactive,
+      doubleClickZoom: interactive,
+      boxZoom: interactive,
+      keyboard: interactive,
+      touchZoom: interactive,
     }).setView([39.5, -98.35], 4);
     L.tileLayer(tileUrl, {
-      maxZoom: 19, crossOrigin: true,
+      maxZoom: 19,
+      crossOrigin: true,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(m);
     m.on("click", (e) => clickRef.current?.(e.latlng.lat, e.latlng.lng));
@@ -83,8 +98,13 @@ export default function MapView({ tileUrl, markers = [], lines = [], height = 36
       }
     }
     for (const mk of markers) {
-      const marker = L.marker([mk.lat, mk.lon], { icon: icon(mk), draggable: !!mk.draggable, title: mk.title });
-      if (mk.title) marker.bindTooltip(mk.title);
+      const marker = L.marker([mk.lat, mk.lon], { icon: icon(mk), draggable: !!mk.draggable });
+      if (mk.title) {
+        // Leaflet reads a string as HTML. The title carries pasted address text, so pass it as plain text.
+        const label = document.createElement("span");
+        label.textContent = mk.title;
+        marker.bindTooltip(label);
+      }
       if (mk.onClick) marker.on("click", mk.onClick);
       if (mk.highlight) marker.setZIndexOffset(1000);
       if (mk.onDrag) {
@@ -94,6 +114,7 @@ export default function MapView({ tileUrl, markers = [], lines = [], height = 36
         });
       }
       marker.addTo(group);
+      if (mk.title) marker.getElement()?.setAttribute("aria-label", mk.title);
     }
   }, [markers, lines]);
 
@@ -110,7 +131,8 @@ export default function MapView({ tileUrl, markers = [], lines = [], height = 36
   }, [fitKey]);
 
   useEffect(() => {
-    if (map.current && panTo) map.current.setView([panTo.lat, panTo.lon], Math.max(map.current.getZoom(), 15), { animate: true });
+    if (map.current && panTo)
+      map.current.setView([panTo.lat, panTo.lon], Math.max(map.current.getZoom(), 15), { animate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panTo?.key]);
 

@@ -50,12 +50,9 @@ def match_stop(stop: PlanStop, book: AddressBook) -> None:
     """Set the stop's match state: matched, possible, new or invalid."""
     stop.address_id = None
     stop.address = None
-    stop.candidate_address_id = None
     stop.candidate_address_ids = None
     stop.is_new_address = False
-    stop.problem = row_problem(
-        {"street": stop.street, "zip": stop.zip, "state": stop.state}
-    )
+    stop.problem = row_problem({"street": stop.street, "zip": stop.zip, "state": stop.state})
     if stop.problem:
         stop.match_state = "invalid"
         return
@@ -68,7 +65,6 @@ def match_stop(stop: PlanStop, book: AddressBook) -> None:
     close = book.possible(stop.street, stop.unit, stop.zip)
     if close:
         stop.match_state = "possible"
-        stop.candidate_address_id = close[0].id
         stop.candidate_address_ids = [a.id for a in close]
         return
     stop.match_state = "new"

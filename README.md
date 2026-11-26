@@ -31,9 +31,9 @@ To change the port or database password, copy `.env.example` to `.env` and edit 
 1. **Paste.** Copy the rows in Excel and paste them into the Day plan page. One address per row; columns are street address, unit number, city, state, zip; no header row. The app works out which column is which and shows its guess above the table, where you can correct it. The layout is remembered.
 2. **Review.** Each row is marked *Matched*, *Possible match*, *New address* or *Fix this row*. Every cell is editable.
 3. **Check new addresses.** Each new address is shown as a pin on a map next to what the lookup found. Confirm it, drag the pin, or click the right spot. A confirmed address is saved and never asked about again.
-4. **Drivers and options.** Tick who is working, choose fastest time or least miles, set the time drivers leave, and choose optimized or list order per driver.
-5. **Build routes.** Volunteers get their usual stops, then are filled up to their limits with extra stops. Staff share the rest.
-6. **Adjust.** Move a stop to another driver for the day, nudge a stop earlier or later in its route with the arrows, add a note to an address, or make a volunteer's extra stop one of their usual stops. **Undo** reverses the last "make usual".
+4. **Drivers and options.** Tick who is working, choose fastest time or least miles, and set the time drivers leave.
+5. **Build routes.** Volunteers get their usual stops, then are filled up to their limits with extra stops. Staff share the rest. Each route is put in the best order for the day's choice of time or miles.
+6. **Adjust.** Move a stop to another driver for the day, drag a stop to a new place in its route (or nudge it with the arrows), add a note to an address, or make a volunteer's extra stop one of their usual stops. **Undo** reverses the last "make usual".
 7. **Export.** Download the CSV (list order, with list order number, driver, stop number, estimated arrival and notes columns), or open the driver sheets (driving order, with each stop's list order number beside it) and print them, save them as PDF, or download each as an image. Each sheet carries QR codes that open the route in Google Maps on a phone.
 
 ### How stops are handed out
@@ -48,7 +48,7 @@ To change the port or database password, copy `.env.example` to `.env` and edit 
 - A volunteer's maximum route time means **driving time only**.
 - **Estimated arrival times** are the day's start time, plus driving, plus a set number of minutes at each earlier stop (Settings → Planning, 5 by default). They are estimates and do not affect who gets which stop.
 - **Notes** belong to the address, so they come back every time that address is on a list, and print on the driver sheet.
-- A route **arranged by hand** keeps that order when routes are rebuilt, until you press *Back to automatic order* or pick an order for that driver again.
+- A route **arranged by hand** keeps that order when routes are rebuilt, until you press *Back to automatic order*. Rearranging a route recalculates only that route; who has which stop does not change.
 - **Google Maps links** hold at most 10 places each, so a longer route gets several QR codes, each starting where the last one ended.
 
 ## What is inside
@@ -85,13 +85,28 @@ Routing and optimization run locally and need no outside service.
 cd backend
 pip install -r requirements-dev.txt
 python -m pytest                      # builds a small made-up street grid and runs the whole workflow on it
+ruff check . && ruff format .         # lint, then format
 uvicorn app.main:app --reload         # uses a local SQLite file unless DATABASE_URL is set
 
 # Interface
 cd frontend
 npm install
 npm run dev                           # http://localhost:5173, forwards /api to localhost:8000
+npm run lint && npm run format        # lint, then format
 ```
+
+The same checks (lint, formatting, tests, build) run on every pull request; see `.github/workflows/ci.yml`.
+
+**Where things are.**
+
+| Path | What is there |
+|---|---|
+| `backend/app/api/` | The endpoints, one file per area: `setup` (settings, region, lookup), `drivers`, `addresses`, `day` (the pasted list and review table), `routes` (building and adjusting routes, CSV), `imports`, `backup`. `shared.py` holds what they have in common. |
+| `backend/app/planner.py` | Who takes which stop and in what order. `compute()` is the outline; each step is a function below it. |
+| `backend/app/optimizer.py`, `routing.py` | The VROOM optimizer and the Valhalla routing engine. |
+| `backend/app/matching.py`, `parsing.py` | Reading pasted rows and matching them to known addresses. |
+| `backend/app/db.py`, `models.py` | The database tables, and the in-place upgrade run at start-up. |
+| `frontend/src/` | One file per page (`DayPage`, `DriversPage`, `AddressesPage`, `SettingsPage`, `PrintPage`), with shared pieces in `ui.tsx`, `useAction.ts`, `routePins.ts` and `util.ts`. |
 
 **Try it offline.** `cd frontend && npm run build`, then `cd backend && python -m tests.demo_server` and open http://localhost:8000. This runs the full app on a made-up 10 by 10 street grid with a fake address lookup. Addresses look like `37 Grid St` (the number picks the spot). The map background will be blank without internet, but pins and routes are drawn.
 

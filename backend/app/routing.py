@@ -6,6 +6,7 @@ background, and the old one stays in use until the new one is ready.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import httpx
@@ -22,6 +24,7 @@ import valhalla
 DATA_DIR = Path(os.environ.get("MAP_DATA_DIR", "./data")).resolve()
 UNREACHABLE = 1_000_000  # seconds or meters used when no road connects two points
 MAX_SNAP_M = 1500  # an address further than this from any road is outside the map
+RECENT_TABLES = 8  # travel tables kept in memory, so re-ordering a route does not ask for them again
 
 
 class RoutingError(Exception):
@@ -35,6 +38,7 @@ class Router:
         self.state_file = self.data_dir / "region.json"
         self._lock = threading.Lock()
         self._actor = None
+        self._tables: OrderedDict[tuple, tuple[list, list]] = OrderedDict()
         self._build_thread: threading.Thread | None = None
         self.state = {"status": "none", "name": "", "url": "", "message": "", "dir": "", "built_at": None}
         self.pending = None  # progress of a build in flight
@@ -44,10 +48,8 @@ class Router:
 
     def _load_state(self) -> None:
         if self.state_file.exists():
-            try:
+            with contextlib.suppress(Exception):
                 self.state.update(json.loads(self.state_file.read_text()))
-            except Exception:
-                pass
         if self.state.get("dir") and Path(self.state["dir"]).exists():
             try:
                 self._actor = valhalla.Actor(str(Path(self.state["dir"]) / "valhalla.json"))
@@ -83,12 +85,14 @@ class Router:
         cfg["mjolnir"]["concurrency"] = max(1, (os.cpu_count() or 2) - 1)
         # The defaults are sized for a public server. A day's plan needs a table
         # of every stop against every stop, and a route through all of a driver's stops.
-        cfg["service_limits"]["auto"].update({
-            "max_locations": 2000,
-            "max_matrix_location_pairs": 4_000_000,
-            "max_matrix_distance": 5_000_000.0,
-            "max_distance": 5_000_000.0,
-        })
+        cfg["service_limits"]["auto"].update(
+            {
+                "max_locations": 2000,
+                "max_matrix_location_pairs": 4_000_000,
+                "max_matrix_distance": 5_000_000.0,
+                "max_distance": 5_000_000.0,
+            }
+        )
         path = region_dir / "valhalla.json"
         path.write_text(json.dumps(cfg))
         return path
@@ -135,11 +139,14 @@ class Router:
             region_dir.mkdir(parents=True, exist_ok=True)
             pbf = region_dir / "map.osm.pbf"
             self._fetch(url, pbf)
-            self.pending.update(status="building", message="Building the road network. This can take a while for a large region.")
+            self.pending.update(
+                status="building", message="Building the road network. This can take a while for a large region."
+            )
             cfg = self._write_config(region_dir)
             proc = subprocess.run(
                 [sys.executable, "-m", "valhalla", "valhalla_build_tiles", "-c", str(cfg), str(pbf)],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             tiles = list((region_dir / "tiles").rglob("*.gph"))
             if proc.returncode != 0 or not tiles:
@@ -150,9 +157,14 @@ class Router:
             old_dir = self.state.get("dir")
             with self._lock:
                 self._actor = actor
+                self._tables.clear()  # they belong to the old map
             self.state = {
-                "status": "ready", "name": name, "url": url, "message": "",
-                "dir": str(region_dir), "built_at": time.strftime("%Y-%m-%d %H:%M"),
+                "status": "ready",
+                "name": name,
+                "url": url,
+                "message": "",
+                "dir": str(region_dir),
+                "built_at": time.strftime("%Y-%m-%d %H:%M"),
             }
             self._save_state()
             self.pending = None
@@ -186,15 +198,26 @@ class Router:
         return {"auto": opts}
 
     def matrix(self, points: list[tuple[float, float]], avoid_highways: bool, shortest: bool):
-        """Travel time (s) and distance (m) between every pair of points."""
+        """Travel time (s) and distance (m) between every pair of points.
+
+        The last few answers are remembered: a day's places stay the same while the
+        dispatcher adjusts its routes. Callers must not change the tables they get back.
+        """
         actor = self._require()
+        key = (tuple(points), avoid_highways, shortest)
         locs = [{"lat": lat, "lon": lon} for lat, lon in points]
         req = {
-            "sources": locs, "targets": locs, "costing": "auto", "units": "kilometers",
+            "sources": locs,
+            "targets": locs,
+            "costing": "auto",
+            "units": "kilometers",
             "costing_options": self._costing_options(avoid_highways, shortest),
         }
         try:
             with self._lock:
+                if key in self._tables:
+                    self._tables.move_to_end(key)
+                    return self._tables[key]
                 res = actor.matrix(req)
         except Exception as exc:
             raise RoutingError(f"Could not compute travel times: {exc}") from exc
@@ -209,17 +232,22 @@ class Router:
                 t, d = cell.get("time"), cell.get("distance")
                 durations[i][j] = UNREACHABLE if t is None else int(round(t))
                 distances[i][j] = UNREACHABLE if d is None else int(round(d * 1000))
+        with self._lock:
+            self._tables[key] = (durations, distances)
+            while len(self._tables) > RECENT_TABLES:
+                self._tables.popitem(last=False)
         return durations, distances
 
     def route_shapes(self, points: list[tuple[float, float]], avoid_highways: bool, shortest: bool) -> list[str]:
         """The road path through the points in order, as encoded polylines (precision 6)."""
         actor = self._require()
-        cleaned = [points[0]] + [p for prev, p in zip(points, points[1:]) if p != prev]
+        cleaned = [points[0]] + [p for prev, p in zip(points, points[1:], strict=False) if p != prev]
         if len(cleaned) < 2:
             return []
         req = {
             "locations": [{"lat": lat, "lon": lon} for lat, lon in cleaned],
-            "costing": "auto", "directions_type": "none",
+            "costing": "auto",
+            "directions_type": "none",
             "costing_options": self._costing_options(avoid_highways, shortest),
         }
         try:

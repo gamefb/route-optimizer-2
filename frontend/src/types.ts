@@ -12,7 +12,6 @@ export interface Driver {
   end_lat: number | null;
   end_lon: number | null;
   avoid_highways: boolean;
-  default_working: boolean;
   start_time: string;
   max_stops: number | null;
   max_route_minutes: number | null;
@@ -79,7 +78,6 @@ export interface Stop {
   usual_driver_id: number | null;
   notes: string;
   eta: string | null;
-  candidate: Address | null;
   candidates: Address[];
   manual_driver_id: number | null;
   driver_id: number | null;
@@ -103,14 +101,13 @@ export interface RouteResult {
   color: string;
   locked: boolean;
   avoid_highways: boolean;
-  order_mode: "optimized" | "list" | "manual";
+  order_mode: "optimized" | "manual";
   start_time: string;
   finish_time: string;
   stop_ids: number[];
   stops: number;
   time_s: number;
   distance_m: number;
-  counts: Record<string, number>;
   over_limit: string[];
   shapes: string[];
   start: [number, number];
@@ -133,11 +130,11 @@ export interface Plan {
   day: string;
   objective: "time" | "distance";
   working_driver_ids: number[];
-  order_modes: Record<string, string>;
   layout: string[];
   stale: boolean;
   start_time: string;
   undo_label: string;
+  sample: string[]; // the first pasted row, shown above the column choices
   result: PlanResult | null;
   stops: Stop[];
 }
@@ -178,29 +175,4 @@ export interface RegionInfo {
   built_at: string | null;
   ready: boolean;
   pending: { name: string; url: string; status: string; message: string } | null;
-}
-
-export interface SummaryRoute {
-  driver_id: number;
-  name: string;
-  kind: Kind;
-  stops: number;
-  time_s: number;
-  distance_m: number;
-  over_limit: string[];
-  limits: Limits | null;
-  locked: boolean;
-}
-
-export interface Summary {
-  totals: { time_s: number; distance_m: number; stops: number };
-  routes: SummaryRoute[];
-  unassigned: number;
-}
-
-export interface ReshufflePreview {
-  before: Summary | null;
-  after: Summary;
-  usual_stop_changes: number;
-  locked_untouched: string[];
 }

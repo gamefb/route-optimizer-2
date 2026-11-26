@@ -3,6 +3,7 @@ import { api } from "./api";
 import MapView from "./MapView";
 import type { Address, Candidate, Stop } from "./types";
 import { ErrorNote, Modal } from "./ui";
+import { errorText, useAction } from "./useAction";
 import { addressLine } from "./util";
 
 interface Props {
@@ -23,8 +24,7 @@ export default function ValidateDialog({ stop, remaining, tileUrl, onConfirm, on
   const [pin, setPin] = useState<{ lat: number; lon: number } | null>(null);
   const [moved, setMoved] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const { busy, error, setError, run: act } = useAction();
 
   useEffect(() => {
     let live = true;
@@ -35,7 +35,8 @@ export default function ValidateDialog({ stop, remaining, tileUrl, onConfirm, on
     setPin(null);
     setMoved(false);
     setChosen(0);
-    api.candidates(stop.id)
+    api
+      .candidates(stop.id)
       .then((res) => {
         if (!live) return;
         setCandidates(res.candidates);
@@ -43,25 +44,15 @@ export default function ValidateDialog({ stop, remaining, tileUrl, onConfirm, on
         if (res.candidates.length) setPin({ lat: res.candidates[0].lat, lon: res.candidates[0].lon });
         if (res.error && !res.candidates.length) setError(res.error);
       })
-      .catch((e) => live && setError((e as Error).message))
+      .catch((e) => live && setError(errorText(e)))
       .finally(() => live && setLoading(false));
-    return () => { live = false; };
-  }, [stop.id]);
+    return () => {
+      live = false;
+    };
+  }, [stop.id, setError]);
 
   const current = candidates[chosen];
   const outside = !moved && current?.on_map === false;
-
-  async function act(fn: () => Promise<void>) {
-    setBusy(true);
-    setError("");
-    try {
-      await fn();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <Modal title="Check this address on the map" onClose={onClose} wide>
@@ -74,18 +65,26 @@ export default function ValidateDialog({ stop, remaining, tileUrl, onConfirm, on
           {loading && <div className="muted">Looking up…</div>}
           {!loading && !candidates.length && (
             <div className="note note-warn">
-              Nothing was found for this address. Fix the spelling in the table, or click the map to place the pin yourself.
+              Nothing was found for this address. Fix the spelling in the table, or click the map to place the pin
+              yourself.
             </div>
           )}
           {candidates.map((c, i) => (
             <label key={i} className={`candidate${i === chosen ? " candidate-on" : ""}`}>
               <input
-                type="radio" checked={i === chosen}
-                onChange={() => { setChosen(i); setPin({ lat: c.lat, lon: c.lon }); setMoved(false); }}
+                type="radio"
+                checked={i === chosen}
+                onChange={() => {
+                  setChosen(i);
+                  setPin({ lat: c.lat, lon: c.lon });
+                  setMoved(false);
+                }}
               />
               <span>
                 {c.label}
-                {c.confidence === "low" && <span className="warn-text"> Low confidence{c.note ? `: ${c.note}` : ""}.</span>}
+                {c.confidence === "low" && (
+                  <span className="warn-text"> Low confidence{c.note ? `: ${c.note}` : ""}.</span>
+                )}
                 {c.on_map === false && <span className="bad-text"> Outside the loaded map region.</span>}
               </span>
             </label>
@@ -106,24 +105,47 @@ export default function ValidateDialog({ stop, remaining, tileUrl, onConfirm, on
           )}
 
           <ErrorNote message={error} />
-          <div className="hint">Drag the pin or click the map if the spot is wrong. The confirmed spot is saved and reused.</div>
+          <div className="hint">
+            Drag the pin or click the map if the spot is wrong. The confirmed spot is saved and reused.
+          </div>
           <div className="row validate-actions">
             <button
-              className="btn btn-primary" disabled={busy || !pin || outside}
+              className="btn btn-primary"
+              disabled={busy || !pin || outside}
               onClick={() => pin && act(() => onConfirm(pin.lat, pin.lon))}
-            >Confirm location</button>
-            <button className="btn btn-ghost" disabled={busy} onClick={onSkip}>Skip for now</button>
+            >
+              Confirm location
+            </button>
+            <button className="btn btn-ghost" disabled={busy} onClick={onSkip}>
+              Skip for now
+            </button>
             <span className="muted">{remaining} left to check</span>
           </div>
         </div>
         <MapView
-          tileUrl={tileUrl} height={420}
+          tileUrl={tileUrl}
+          height={420}
           fitKey={pin ? `${stop.id}:${chosen}:${moved ? "moved" : "auto"}:${pin.lat}` : `none:${stop.id}`}
-          markers={pin ? [{
-            lat: pin.lat, lon: pin.lon, draggable: true, color: "#dc2626",
-            onDrag: (lat, lon) => { setPin({ lat, lon }); setMoved(true); },
-          }] : []}
-          onClick={(lat, lon) => { setPin({ lat, lon }); setMoved(true); }}
+          markers={
+            pin
+              ? [
+                  {
+                    lat: pin.lat,
+                    lon: pin.lon,
+                    draggable: true,
+                    color: "#dc2626",
+                    onDrag: (lat, lon) => {
+                      setPin({ lat, lon });
+                      setMoved(true);
+                    },
+                  },
+                ]
+              : []
+          }
+          onClick={(lat, lon) => {
+            setPin({ lat, lon });
+            setMoved(true);
+          }}
         />
       </div>
     </Modal>

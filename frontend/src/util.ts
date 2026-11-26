@@ -60,7 +60,10 @@ export function shiftDay(day: string, by: number): string {
 export function longDate(day: string): string {
   const [y, m, d] = day.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 }
 
@@ -83,7 +86,10 @@ export function googleMapsLinks(points: [number, number][]): string[] {
   while (i < points.length - 1) {
     const part = points.slice(i, i + 10);
     const params = new URLSearchParams({
-      api: "1", travelmode: "driving", origin: fmt(part[0]), destination: fmt(part[part.length - 1]),
+      api: "1",
+      travelmode: "driving",
+      origin: fmt(part[0]),
+      destination: fmt(part[part.length - 1]),
     });
     const middle = part.slice(1, -1);
     if (middle.length) params.set("waypoints", middle.map(fmt).join("|"));
@@ -100,11 +106,15 @@ export function googleMapsLinks(points: [number, number][]): string[] {
 export function fuzzyMatch(query: string, text: string): boolean {
   const hay = text.toLowerCase();
   const words = hay.split(/[^a-z0-9]+/).filter(Boolean);
-  return query.toLowerCase().split(/\s+/).filter(Boolean).every((q) => {
-    if (hay.includes(q)) return true;
-    if (q.length < 3) return false;
-    return words.some((w) => inOrder(q, w) || nearly(q, w.slice(0, Math.max(q.length, 1) + 1)));
-  });
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((q) => {
+      if (hay.includes(q)) return true;
+      if (q.length < 3) return false;
+      return words.some((w) => inOrder(q, w) || nearly(q, w.slice(0, Math.max(q.length, 1) + 1)));
+    });
 }
 
 function inOrder(q: string, w: string): boolean {
@@ -124,7 +134,8 @@ function nearly(a: string, b: string): boolean {
     for (let j = 1; j <= b.length; j++) {
       cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
       // two letters swapped ("gird" for "grid") counts as one slip
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) cur[j] = Math.min(cur[j], before[j - 2] + 1);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+        cur[j] = Math.min(cur[j], before[j - 2] + 1);
     }
     before = prev;
     prev = cur;
