@@ -23,22 +23,22 @@ validation: # with "mkdocs build --strict", any of these fails the build
     absolute_links: warn
 nav:
   - Home: index.md
-  - Getting started:
-      - Run it on your computer: install/local.md
-      - Run it with Docker: install/docker.md
-      - First-time setup: install/first-time.md
-      - Moving between the two: install/moving.md
-      - Removing it: install/uninstall.md
-  - A day's routes:
-      - 1. Paste the addresses: daily/paste.md
-      - 2. Review the table: daily/review.md
-      - 3. Drivers and options: daily/drivers-options.md
-      - 4. Build and read the routes: daily/routes.md
-      - 5. Adjust the routes: daily/adjust.md
-      - 6. Export: daily/export.md
+  - Installation:
+      - Running locally: install/local.md
+      - Running via Docker: install/docker.md
+      - Initial setup: install/first-time.md
+      - Migrating between local and Docker: install/moving.md
+      - Uninstalling: install/uninstall.md
+  - Daily workflow:
+      - 1. Entering addresses: daily/paste.md
+      - 2. Reviewing addresses: daily/review.md
+      - 3. Selecting drivers and options: daily/drivers-options.md
+      - 4. Building routes: daily/routes.md
+      - 5. Adjusting routes: daily/adjust.md
+      - 6. Exporting: daily/export.md
   - Reference:
       - Drivers: reference/drivers.md
-      - How stops are handed out: reference/assignment.md
+      - Stop assignment: reference/assignment.md
       - Addresses and import: reference/addresses.md
       - Settings: reference/settings.md
       - Backup and restore: reference/backup.md

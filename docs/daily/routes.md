@@ -1,19 +1,19 @@
-# 4. Build and read the routes
+# 4. Building routes
 
 When you press **Build routes**, the app hands the stops out and puts each driver's stops in order. The result appears under **Routes**.
 
 ![The routes: totals, the map, and each driver's list of stops](../img/routes.png)
 
-## The totals
+## Totals
 
-The line at the top gives the number of stops, the total driving time and the total distance for the day, and says whether the routes were optimized for time or miles. **Download CSV** and **Driver sheets** are on the right; see [Export](export.md).
+The line at the top gives the number of stops, the total driving time and the total distance for the day, and says whether the routes were optimized for time or miles. **Download CSV** and **Driver sheets** are on the right; see [Exporting](export.md).
 
 Below it you may see:
 
 - **A driver was left out** because they have no start and end location.
 - **Stops that are not on any route**, each with the reason. This happens when no staff driver is working and the volunteers cannot take everything within their limits.
 
-## The map
+## Map
 
 Each driver has a color. On the map:
 
@@ -26,7 +26,7 @@ Click a **pin** to jump to that stop in the lists. Click a **stop** in a list to
 
 On a wide screen the map stays in place beside the lists as you scroll. On a narrow one it sits above them.
 
-## A driver's list
+## Driver lists
 
 ![One volunteer's route](../img/route-card.png)
 
@@ -56,7 +56,7 @@ The time beside each stop is an estimate: the time the driver leaves, plus the d
 
 The estimates do not affect who gets which stop.
 
-## When something changes
+## Out-of-date routes
 
 If you change the list, the drivers, or a setting that affects planning after the routes were built, a yellow line says **Something changed since these routes were built**. Press **Rebuild routes** to bring them up to date.
 

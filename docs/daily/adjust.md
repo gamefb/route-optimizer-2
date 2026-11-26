@@ -1,8 +1,8 @@
-# 5. Adjust the routes
+# 5. Adjusting routes
 
 The routes the app builds are a starting point. You can move stops between drivers, change the order, add notes, and turn an extra stop into a usual one.
 
-## Move a stop to another driver
+## Moving a stop to another driver
 
 There are two ways.
 
@@ -18,7 +18,7 @@ Either way:
 - To undo it, open **Move…** on that stop and choose **Back to automatic**.
 - A move onto a volunteer is kept even if it takes them over a limit. Their list then shows a red **Over limit** line.
 
-### Other stops may move too
+### Effects on other stops
 
 Moving one stop rebuilds the day around it, so other stops can change driver as a result. For example, if staff share stops evenly and you give one driver an extra stop, another of their stops may pass to someone else.
 
@@ -30,7 +30,7 @@ When that happens, a message lists every other stop that changed driver. If no m
 
 Nothing can be added to a locked volunteer's stops and none of their usual stops can be moved away. They are not offered in the bar or the menu. Turn the lock off on the [Drivers](../reference/drivers.md#lock) page first.
 
-## Change the order of a route
+## Reordering a route
 
 **Drag** a stop by its handle to a new place in the same list, or use the **▲** and **▼** arrows beside its stop number to move it one place.
 
@@ -48,7 +48,7 @@ Type in **Add a note for this address** under a stop and press Enter. Use it for
 
 A note belongs to the address, not to the day. It comes back every time that address is on a list, prints on the driver sheet, and is included in the CSV. You can also edit notes on the [Addresses](../reference/addresses.md) page.
 
-## Make an extra stop a usual stop
+## Making an extra stop a usual stop
 
 A stop labeled **Added today** or **Moved here by you** on a volunteer's list is theirs for today only. To make it one of their usual stops from now on:
 

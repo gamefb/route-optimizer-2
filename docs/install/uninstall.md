@@ -1,11 +1,11 @@
-# Removing it
+# Uninstalling
 
 Route Planner does not install itself anywhere else on your computer. It adds no shortcuts, no services and no registry entries. Removing it means stopping it and deleting what it made.
 
 !!! warning "Keep a backup first if you may want the data again"
     Removing the app deletes your drivers, addresses, usual stops, notes and settings. If you might set it up again, open **Settings → Backup**, press **Download backup** and keep the file somewhere outside the project folder. See [Backup and restore](../reference/backup.md).
 
-## If you ran it on your computer
+## Local installation
 
 1. Stop the app: press `Ctrl+C` in its window, or close the window.
 2. Delete the project folder.
@@ -21,12 +21,12 @@ That removes everything, because the app keeps all of it inside that folder:
 
 If you started it with `--data` pointing at another folder, delete that folder too.
 
-### Optional: what is left outside the folder
+### Optional: shared caches and runtimes
 
 - **Download caches.** Python and Node.js keep copies of downloaded packages so that other programs can reuse them. They are shared, not Route Planner's own, and safe to leave. To clear them anyway, run `python -m pip cache purge` and `npm cache clean --force`.
 - **Python and Node.js themselves.** Uninstall them like any other program (on Windows: **Settings → Apps → Installed apps**), but only if nothing else on the computer uses them.
 
-## If you ran it with Docker
+## Docker installation
 
 1. Open a terminal in the project folder, the one with `docker-compose.yml` in it.
 2. Run:
@@ -40,7 +40,7 @@ If you started it with `--data` pointing at another folder, delete that folder t
 
 Run step 2 from the project folder before deleting it, and without renaming the folder first: Docker names the app's containers and volumes after the folder, and uses that name to find them.
 
-### Optional: Docker's build cache
+### Optional: Docker build cache
 
 Docker keeps intermediate build steps so that the next build is faster. To clear them, run `docker builder prune`. This clears the cache for every project on the computer, not only this one. Leave it if you build other things with Docker.
 

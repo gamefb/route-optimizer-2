@@ -1,8 +1,8 @@
-# First-time setup
+# Initial setup
 
 Do these three things once, in this order. Each has its own page in the app.
 
-## 1. Load a map
+## 1. Loading a map
 
 Open **Settings** and find **Map region**.
 
@@ -15,7 +15,7 @@ Routes cannot be built until a map is ready, and an address outside the map cann
 
 See [Settings](../reference/settings.md#map-region) for more.
 
-## 2. Add your drivers
+## 2. Adding drivers
 
 Open **Drivers** and press **Add driver** for each one.
 
@@ -27,7 +27,7 @@ A driver without a start location is left out of the routes.
 
 See [Drivers](../reference/drivers.md) for what each choice means.
 
-## 3. Import your address list (optional)
+## 3. Importing addresses (optional)
 
 If you already keep a list of regular addresses, importing it saves confirming each address on the map one at a time on your first day.
 
@@ -35,4 +35,4 @@ Open **Addresses** and press **Import a list…**. Paste the rows from Excel: st
 
 See [Addresses and import](../reference/addresses.md#importing-a-list) for the details.
 
-You are now ready for [a day's routes](../daily/paste.md).
+You are now ready for the [daily workflow](../daily/paste.md).

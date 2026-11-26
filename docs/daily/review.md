@@ -1,10 +1,10 @@
-# 2. Review the table
+# 2. Reviewing addresses
 
 After a paste, the rows appear in a table under **Review the table**. Each row is matched against the addresses the app already knows. Routes can only be built once every row is *Matched*.
 
 ![The review table showing only the rows that need attention](../img/review-attention.png)
 
-## What each status means
+## Row statuses
 
 | Status | Meaning | What to do |
 |---|---|---|

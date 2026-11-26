@@ -2,7 +2,7 @@
 
 Route Planner is built for one dispatcher on a computer or network you control. This page says what that means in practice.
 
-## There is no login
+## No login
 
 Anyone who can open the app can see and change everything in it: drivers, addresses, notes and settings. They can also use any API key you saved, although a saved key is never shown again.
 
@@ -16,9 +16,9 @@ So the question that matters is **who can open it**.
 
 Never make the app reachable from the internet, for example by forwarding a port on your router to it.
 
-If you run it on your own computer and want a colleague's computer to open it too, start it with `--host 0.0.0.0` (see [Run it on your computer](../install/local.md#options)), and only on a network you trust.
+If you run it on your own computer and want a colleague's computer to open it too, start it with `--host 0.0.0.0` (see [Running locally](../install/local.md#launch-options)), and only on a network you trust.
 
-## What leaves your computer
+## Data sent to other services
 
 Routes are worked out on your computer. These are the only things sent elsewhere:
 
@@ -31,13 +31,13 @@ Routes are worked out on your computer. These are the only things sent elsewhere
 
 Names of drivers, notes, and your list as a whole are not sent anywhere.
 
-## What is stored, and where
+## Stored data
 
 The database holds your drivers, addresses, notes, day plans and settings. API keys are stored in it as they are, without encryption, and are included in [backup files](backup.md).
 
 Treat the `local-data` folder (or the Docker volumes) and any backup file as you would the spreadsheet the addresses came from.
 
-## Known vulnerabilities in the software it is built on
+## Known vulnerabilities in dependencies
 
 The app is built on other people's software: Python and JavaScript packages, and for Docker, a web server and a database. Known security problems in those are published as CVEs and advisories.
 
@@ -50,7 +50,7 @@ The app is built on other people's software: Python and JavaScript packages, and
 
 The Docker images' operating system packages were not scanned.
 
-### Checking again
+### Re-checking
 
 New problems are found all the time, so a clean result today says nothing about next year. To check again, from the project folder:
 

@@ -1,4 +1,4 @@
-# How stops are handed out
+# Stop assignment
 
 Each time routes are built, the app works through the day's stops in two passes.
 
@@ -21,9 +21,9 @@ How it is shared is a [setting](settings.md#planning):
 | **Roughly the same driving time each** | Drivers end up with similar driving times. |
 | **No sharing: lowest total only** | Only the day's total is minimized. One driver usually ends up with nearly everything. |
 
-## The order of each route
+## Route order
 
-Each driver's stops are then put in the order that gives the least driving time or miles, starting at the driver's start location and finishing at their end location. A route you have [arranged by hand](../daily/adjust.md#change-the-order-of-a-route) keeps your order.
+Each driver's stops are then put in the order that gives the least driving time or miles, starting at the driver's start location and finishing at their end location. A route you have [arranged by hand](../daily/adjust.md#reordering-a-route) keeps your order.
 
 ## Special cases
 
@@ -39,7 +39,7 @@ Each driver's stops are then put in the order that gives the least driving time 
 
 **Two orders cost exactly the same.** A loop driven clockwise or anticlockwise takes the same time. When that happens the app may give either direction, and a rebuild may give the other.
 
-## What does not affect who gets a stop
+## Factors that do not affect assignment
 
 - **Estimated arrival times** and the minutes allowed at each stop. They are worked out after the stops are handed out.
 - **Notes.**

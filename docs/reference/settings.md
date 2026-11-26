@@ -26,7 +26,7 @@ Changing the region does not remove any known addresses. An address outside the 
 - *Roughly the same driving time each*
 - *No sharing: lowest total only*, which usually gives one driver nearly everything
 
-See [How stops are handed out](assignment.md#pass-2-staff).
+See [Stop assignment](assignment.md#pass-2-staff).
 
 **Minutes allowed at each stop** is used for estimated arrival times only. The default is 5.
 
