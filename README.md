@@ -1,10 +1,27 @@
 # Route Planner
 
+**[Read the guide](docs/index.md)** for setup and day-to-day use. In the running app, the same pages open from **Help** in the top bar.
+
 An internal web app for planning daily shipping routes across staff and volunteer drivers.
 
 Each day the dispatcher pastes that day's addresses from Excel. The app matches them to addresses it already knows, has the dispatcher confirm any new ones on a map, hands the stops out (volunteers first, up to their limits, then staff), and produces a route per driver. Results export as a CSV or as printable driver sheets.
 
 ## Start it
+
+There are two ways. Both end with the app at **http://localhost:8080**.
+
+### On your own computer, without Docker
+
+The simplest choice for one person on one computer. You need 64-bit Python 3.12 to 3.14, and Node.js 22 or newer to build the screens.
+
+- **Windows:** double-click `start-local.bat`
+- **Linux:** `./start-local.sh`
+
+The first start takes a few minutes while it installs the app's packages and builds the screens. Leave the window open while you use the app. Everything it keeps (the database, the map, daily backups) is in the `local-data` folder.
+
+Started this way the app can be opened from this computer only. `python run_local.py --help` lists the options.
+
+### With Docker
 
 You need Docker with Docker Compose.
 
@@ -12,11 +29,9 @@ You need Docker with Docker Compose.
 docker compose up -d --build
 ```
 
-Then open **http://localhost:8080** (or the server's name on your network, port 8080).
+On Windows, `start.bat` runs the same command. To change the port or database password, copy `.env.example` to `.env` and edit it first.
 
-To change the port or database password, copy `.env.example` to `.env` and edit it first.
-
-> **There is no login.** Anyone who can reach the app can use and change it. Keep it on your internal network and do not expose the port to the public internet.
+> **There is no login.** Anyone who can reach the app can use and change it. With Docker, other computers on your network can open it unless you set `WEB_BIND=127.0.0.1` in `.env`. Never expose it to the public internet.
 
 ## First-time setup
 
@@ -33,7 +48,7 @@ To change the port or database password, copy `.env.example` to `.env` and edit 
 3. **Check new addresses.** Each new address is shown as a pin on a map next to what the lookup found. Confirm it, drag the pin, or click the right spot. A confirmed address is saved and never asked about again.
 4. **Drivers and options.** Tick who is working, choose fastest time or least miles, and set the time drivers leave.
 5. **Build routes.** Volunteers get their usual stops, then are filled up to their limits with extra stops. Staff share the rest. Each route is put in the best order for the day's choice of time or miles.
-6. **Adjust.** Move a stop to another driver for the day, drag a stop to a new place in its route (or nudge it with the arrows), add a note to an address, or make a volunteer's extra stop one of their usual stops. **Undo** reverses the last "make usual".
+6. **Adjust.** Move a stop to another driver for the day (drag it onto their list, or use its *Move* menu), drag a stop to a new place in its route (or nudge it with the arrows), add a note to an address, or make a volunteer's extra stop one of their usual stops. **Undo** reverses the last "make usual".
 7. **Export.** Download the CSV (list order, with list order number, driver, stop number, estimated arrival and notes columns), or open the driver sheets (driving order, with each stop's list order number beside it) and print them, save them as PDF, or download each as an image. Each sheet carries QR codes that open the route in Google Maps on a phone.
 
 ### How stops are handed out
@@ -48,6 +63,8 @@ To change the port or database password, copy `.env.example` to `.env` and edit 
 - A volunteer's maximum route time means **driving time only**.
 - **Estimated arrival times** are the day's start time, plus driving, plus a set number of minutes at each earlier stop (Settings → Planning, 5 by default). They are estimates and do not affect who gets which stop.
 - **Notes** belong to the address, so they come back every time that address is on a list, and print on the driver sheet.
+- **Moving a stop** to another driver rebuilds the day around it, so other stops can change driver too. When that happens the app lists them.
+- Once routes are built, the review table shows each row's **driver and stop number**, and its search finds rows by driver.
 - A route **arranged by hand** keeps that order when routes are rebuilt, until you press *Back to automatic order*. Rearranging a route recalculates only that route; who has which stop does not change.
 - **Google Maps links** hold at most 10 places each, so a longer route gets several QR codes, each starting where the last one ended.
 
@@ -55,7 +72,7 @@ To change the port or database password, copy `.env.example` to `.env` and edit 
 
 | Service | What it does |
 |---|---|
-| `web` | The interface (React), served by nginx. |
+| `web` | The interface (React) and the help pages, served by nginx. |
 | `api` | Python (FastAPI). Holds the data and the planning logic. Runs the Valhalla routing engine and the VROOM optimizer in-process. |
 | `db` | Postgres. |
 
@@ -93,6 +110,10 @@ cd frontend
 npm install
 npm run dev                           # http://localhost:5173, forwards /api to localhost:8000
 npm run lint && npm run format        # lint, then format
+
+# Help pages (the docs folder)
+pip install -r docs/requirements.txt
+mkdocs serve                          # http://localhost:8000 with live reload; "mkdocs build --strict" checks every link
 ```
 
 The same checks (lint, formatting, tests, build) run on every pull request; see `.github/workflows/ci.yml`.
@@ -106,6 +127,8 @@ The same checks (lint, formatting, tests, build) run on every pull request; see 
 | `backend/app/optimizer.py`, `routing.py` | The VROOM optimizer and the Valhalla routing engine. |
 | `backend/app/matching.py`, `parsing.py` | Reading pasted rows and matching them to known addresses. |
 | `backend/app/db.py`, `models.py` | The database tables, and the in-place upgrade run at start-up. |
+| `docs/`, `mkdocs.yml` | The help pages, built into the app at `/help/`. |
+| `run_local.py` | Runs the app without Docker: sets up Python packages, builds the screens and help pages, and serves everything from one process. |
 | `frontend/src/` | One file per page (`DayPage`, `DriversPage`, `AddressesPage`, `SettingsPage`, `PrintPage`), with shared pieces in `ui.tsx`, `useAction.ts`, `routePins.ts` and `util.ts`. |
 
 **Try it offline.** `cd frontend && npm run build`, then `cd backend && python -m tests.demo_server` and open http://localhost:8000. This runs the full app on a made-up 10 by 10 street grid with a fake address lookup. Addresses look like `37 Grid St` (the number picks the spot). The map background will be blank without internet, but pins and routes are drawn.

@@ -47,7 +47,9 @@ export default function Routes({
   const [focus, setFocus] = useState<number | null>(null);
   const [picked, setPicked] = useState<{ id: number; from: "list" | "map"; n: number } | null>(null);
   const mapBox = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<{ driver: number; id: number } | null>(null);
+  // The stop being dragged. "fixed" is a locked volunteer's usual stop: it can be reordered but not handed on.
+  const [drag, setDrag] = useState<{ driver: number; id: number; fixed: boolean } | null>(null);
+  const [overCard, setOverCard] = useState<number | null>(null);
 
   // Clicking a pin scrolls to its stop in the list; clicking a stop brings the map to its pin.
   useEffect(() => {
@@ -68,6 +70,22 @@ export default function Routes({
     }
     setDrag(null);
     setOver(null);
+  }
+
+  /** A stop dragged from another route may be dropped on this one (the same rule as the Move menu). */
+  function canTake(r: RouteResult): boolean {
+    if (!drag || drag.fixed || drag.driver === r.driver_id) return false;
+    const target = working.find((d) => d.id === r.driver_id);
+    return !!target && !(target.locked && target.kind === "volunteer");
+  }
+
+  /** The dragged stop was let go over a driver: their card, or their name in the bar shown during a drag. */
+  function dropOnDriver(r: RouteResult) {
+    const stop = drag ? stopsById.get(drag.id) : undefined;
+    if (stop && canTake(r)) onMove(stop, r.driver_id);
+    setDrag(null);
+    setOver(null);
+    setOverCard(null);
   }
   const names = useMemo(() => new Map(drivers.map((d) => [d.id, d.name])), [drivers]);
   const stopsById = useMemo(() => new Map(plan.stops.map((s) => [s.id, s])), [plan.stops]);
@@ -99,6 +117,7 @@ export default function Routes({
     return { markers, lines };
   }, [result, focus, stopsById, picked]);
   const pickedStop = picked ? stopsById.get(picked.id) : undefined;
+  const takers = result.routes.filter(canTake);
 
   function chip(s: Stop) {
     const who = s.covering_for_id ? names.get(s.covering_for_id) || "a volunteer" : "";
@@ -164,196 +183,240 @@ export default function Routes({
         </div>
       )}
 
-      <div ref={mapBox}>
-        <MapView
-          tileUrl={settings.tile_url}
-          height="min(70vh, 640px)"
-          markers={markers}
-          lines={lines}
-          fitKey={`${result.computed_at}:${focus}`}
-          panTo={
-            picked && picked.from === "list" && pickedStop && pickedStop.lat !== null && pickedStop.lon !== null
-              ? { lat: pickedStop.lat, lon: pickedStop.lon, key: `${picked.id}:${picked.n}` }
-              : null
-          }
-        />
-      </div>
-      <div className="hint">
-        Click a stop to find it on the map, or a pin to find it in the list.{" "}
-        {focus === null ? (
-          "Click a driver's name to show only their route."
-        ) : (
-          <button className="btn-link" onClick={() => setFocus(null)}>
-            Show all routes
-          </button>
-        )}
-      </div>
-
-      <div className="cards">
-        {result.routes.map((r) => {
-          const stops = r.stop_ids.map((id) => stopsById.get(id)).filter((s): s is Stop => !!s);
-          const canMakeUsual =
-            r.kind === "volunteer" && !r.locked && stops.some((s) => s.label === "added" || s.label === "manual");
-          return (
-            <div key={r.driver_id} className={`card${focus === r.driver_id ? " card-focus" : ""}`}>
-              <div className="card-head" onClick={() => setFocus(focus === r.driver_id ? null : r.driver_id)}>
-                <span className="dot" style={{ background: r.color }} />
-                <h3>{r.name}</h3>
-                <Badge kind={r.kind === "volunteer" ? "vol" : "staff"}>
-                  {r.kind === "volunteer" ? "Volunteer" : "Staff"}
-                </Badge>
-                {r.locked && <Badge kind="lock">🔒 Locked</Badge>}
-                {r.avoid_highways && <Badge kind="plain">Avoids highways</Badge>}
-                {r.order_mode === "manual" && <Badge kind="info">Arranged by hand</Badge>}
-              </div>
-              <div className="card-stats">
-                {r.stops} stops · {formatDuration(r.time_s)} driving · {formatDistance(r.distance_m, settings.units)}
-              </div>
-              {r.stops > 0 && (
-                <div className="card-usage">
-                  Leaves {clock(r.start_time)} · done about {clock(r.finish_time)}
-                </div>
-              )}
-              {r.order_mode === "manual" && (
-                <button className="btn btn-small" disabled={busy} onClick={() => onResetOrder(r.driver_id)}>
-                  Back to automatic order
-                </button>
-              )}
-              {r.limits && usageText(r) && <div className="card-usage">Limits: {usageText(r)}</div>}
-              {r.over_limit.map((o, i) => (
-                <div key={i} className="note note-error">
-                  Over limit: {o}
-                </div>
-              ))}
-              {canMakeUsual && (
-                <button className="btn btn-small" disabled={busy} onClick={() => onMakeAllUsual(r.driver_id)}>
-                  Make all added stops usual
-                </button>
-              )}
-              {stops.length === 0 && <div className="muted">No stops today.</div>}
-              <ol className="stops">
-                {stops.map((s, i) => (
-                  <li
-                    key={s.id}
-                    id={`stop-${s.id}`}
-                    onClick={(e) => {
-                      if (!(e.target as HTMLElement).closest("button, select, input, .grip"))
-                        setPicked({ id: s.id, from: "list", n: Date.now() });
-                    }}
-                    className={`${picked?.id === s.id ? "picked " : ""}${drag?.id === s.id ? "dragging" : ""}${over === s.id && drag && drag.driver === r.driver_id && drag.id !== s.id ? " drop-here" : ""}`}
-                    onDragOver={(e) => {
-                      if (drag && drag.driver === r.driver_id) {
-                        e.preventDefault();
-                        setOver(s.id);
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      drop(r, s.id);
-                    }}
-                  >
-                    <span
-                      className="grip"
-                      title="Drag to move this stop within the route"
-                      draggable={!busy}
-                      onDragStart={(e) => {
-                        e.dataTransfer.effectAllowed = "move";
-                        e.dataTransfer.setData("text/plain", String(s.id));
-                        setDrag({ driver: r.driver_id, id: s.id });
-                      }}
-                      onDragEnd={() => {
-                        setDrag(null);
-                        setOver(null);
-                      }}
-                    >
-                      ⠿
-                    </span>
-                    <div className="stop-order">
-                      <button
-                        className="btn-plain"
-                        title="Earlier in the route"
-                        disabled={busy || i === 0}
-                        onClick={() => onReorder(s, -1)}
-                      >
-                        ▲
-                      </button>
-                      <span className="stop-num" style={{ background: r.color }}>
-                        {s.stop_number}
-                      </span>
-                      <button
-                        className="btn-plain"
-                        title="Later in the route"
-                        disabled={busy || i === stops.length - 1}
-                        onClick={() => onReorder(s, 1)}
-                      >
-                        ▼
-                      </button>
-                    </div>
-                    <div className="stop-main">
-                      <div>
-                        {s.eta && <span className="eta">{clock(s.eta)}</span>}
-                        {[s.street, s.unit].filter(Boolean).join(", ")}
-                      </div>
-                      <div className="muted small">
-                        {s.city} {s.zip} · list row {s.seq}
-                        {s.label === "added" && s.added_time_s !== null && s.added_distance_m !== null && (
-                          <>
-                            {" "}
-                            · adds {formatDuration(Math.max(0, s.added_time_s))},{" "}
-                            {formatDistance(Math.max(0, s.added_distance_m), settings.units)}
-                          </>
-                        )}
-                      </div>
-                      <SaveOnBlurInput
-                        trim
-                        className={(text) => `note-input${text ? " note-filled" : ""}`}
-                        value={s.notes}
-                        disabled={busy}
-                        placeholder="Add a note for this address"
-                        maxLength={300}
-                        onSave={(v) => onNotes(s, v)}
-                      />
-                      <div className="chips">
-                        {chip(s)}
-                        {s.is_new_address && r.kind === "volunteer" && <Badge kind="new">New address</Badge>}
-                        {r.kind === "volunteer" && !r.locked && (s.label === "added" || s.label === "manual") && (
-                          <button className="btn btn-small" disabled={busy} onClick={() => onMakeUsual(s)}>
-                            Make usual stop
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <select
-                      className="move"
-                      value=""
-                      disabled={busy || (r.locked && s.label === "usual")}
-                      title={
-                        r.locked && s.label === "usual"
-                          ? "Locked: turn the lock off to move this stop"
-                          : "Move this stop for today"
-                      }
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "auto") onMove(s, null);
-                        else if (v) onMove(s, Number(v));
-                      }}
-                    >
-                      <option value="">Move…</option>
-                      {s.manual_driver_id !== null && <option value="auto">Back to automatic</option>}
-                      {working
-                        .filter((d) => d.id !== r.driver_id && !(d.locked && d.kind === "volunteer"))
-                        .map((d) => (
-                          <option key={d.id} value={d.id}>
-                            To {d.name}
-                          </option>
-                        ))}
-                    </select>
-                  </li>
-                ))}
-              </ol>
+      {/* While a stop is being dragged, every driver who can take it is one short drag away, however long the lists. */}
+      {takers.length > 0 && (
+        <div className="drop-bar" role="group" aria-label="Move this stop to another driver">
+          <span className="muted">Move to</span>
+          {takers.map((r) => (
+            <div
+              key={r.driver_id}
+              className={`drop-chip${overCard === r.driver_id ? " drop-chip-on" : ""}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOverCard(r.driver_id);
+              }}
+              onDragLeave={() => setOverCard(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                dropOnDriver(r);
+              }}
+            >
+              <span className="dot" style={{ background: r.color }} /> {r.name}
             </div>
-          );
-        })}
+          ))}
+        </div>
+      )}
+
+      <div className="routes-layout">
+        <div className="routes-map" ref={mapBox}>
+          <MapView
+            tileUrl={settings.tile_url}
+            height="var(--routes-map-height)"
+            markers={markers}
+            lines={lines}
+            fitKey={`${result.computed_at}:${focus}`}
+            panTo={
+              picked && picked.from === "list" && pickedStop && pickedStop.lat !== null && pickedStop.lon !== null
+                ? { lat: pickedStop.lat, lon: pickedStop.lon, key: `${picked.id}:${picked.n}` }
+                : null
+            }
+          />
+          <div className="hint">
+            Click a stop to find it on the map, or a pin to find it in the list. Drag a stop by its handle to reorder
+            it, or onto another driver to move it there.{" "}
+            {focus === null ? (
+              "Click a driver's name to show only their route."
+            ) : (
+              <button className="btn-link" onClick={() => setFocus(null)}>
+                Show all routes
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="cards">
+          {result.routes.map((r) => {
+            const stops = r.stop_ids.map((id) => stopsById.get(id)).filter((s): s is Stop => !!s);
+            const canMakeUsual =
+              r.kind === "volunteer" && !r.locked && stops.some((s) => s.label === "added" || s.label === "manual");
+            return (
+              <div
+                key={r.driver_id}
+                className={`card${focus === r.driver_id ? " card-focus" : ""}${overCard === r.driver_id ? " card-drop" : ""}`}
+                onDragOver={(e) => {
+                  if (canTake(r)) {
+                    e.preventDefault();
+                    setOverCard(r.driver_id);
+                  }
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOverCard(null);
+                }}
+                onDrop={(e) => {
+                  if (canTake(r)) e.preventDefault();
+                  dropOnDriver(r);
+                }}
+              >
+                <div className="card-head" onClick={() => setFocus(focus === r.driver_id ? null : r.driver_id)}>
+                  <span className="dot" style={{ background: r.color }} />
+                  <h3>{r.name}</h3>
+                  <Badge kind={r.kind === "volunteer" ? "vol" : "staff"}>
+                    {r.kind === "volunteer" ? "Volunteer" : "Staff"}
+                  </Badge>
+                  {r.locked && <Badge kind="lock">🔒 Locked</Badge>}
+                  {r.avoid_highways && <Badge kind="plain">Avoids highways</Badge>}
+                  {r.order_mode === "manual" && <Badge kind="info">Arranged by hand</Badge>}
+                </div>
+                <div className="card-stats">
+                  {r.stops} stops · {formatDuration(r.time_s)} driving · {formatDistance(r.distance_m, settings.units)}
+                </div>
+                {r.stops > 0 && (
+                  <div className="card-usage">
+                    Leaves {clock(r.start_time)} · done about {clock(r.finish_time)}
+                  </div>
+                )}
+                {r.order_mode === "manual" && (
+                  <button className="btn btn-small" disabled={busy} onClick={() => onResetOrder(r.driver_id)}>
+                    Back to automatic order
+                  </button>
+                )}
+                {r.limits && usageText(r) && <div className="card-usage">Limits: {usageText(r)}</div>}
+                {r.over_limit.map((o, i) => (
+                  <div key={i} className="note note-error">
+                    Over limit: {o}
+                  </div>
+                ))}
+                {canMakeUsual && (
+                  <button className="btn btn-small" disabled={busy} onClick={() => onMakeAllUsual(r.driver_id)}>
+                    Make all added stops usual
+                  </button>
+                )}
+                {stops.length === 0 && <div className="muted">No stops today.</div>}
+                <ol className="stops">
+                  {stops.map((s, i) => (
+                    <li
+                      key={s.id}
+                      id={`stop-${s.id}`}
+                      onClick={(e) => {
+                        if (!(e.target as HTMLElement).closest("button, select, input, .grip"))
+                          setPicked({ id: s.id, from: "list", n: Date.now() });
+                      }}
+                      className={`${picked?.id === s.id ? "picked " : ""}${drag?.id === s.id ? "dragging" : ""}${over === s.id && drag && drag.driver === r.driver_id && drag.id !== s.id ? " drop-here" : ""}`}
+                      onDragOver={(e) => {
+                        if (drag && drag.driver === r.driver_id) {
+                          e.preventDefault();
+                          setOver(s.id);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        drop(r, s.id);
+                      }}
+                    >
+                      <span
+                        className="grip"
+                        title="Drag to reorder this stop, or onto another driver to move it there"
+                        draggable={!busy}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", String(s.id));
+                          setDrag({ driver: r.driver_id, id: s.id, fixed: r.locked && s.label === "usual" });
+                        }}
+                        onDragEnd={() => {
+                          setDrag(null);
+                          setOver(null);
+                          setOverCard(null);
+                        }}
+                      >
+                        ⠿
+                      </span>
+                      <div className="stop-order">
+                        <button
+                          className="btn-plain"
+                          title="Earlier in the route"
+                          disabled={busy || i === 0}
+                          onClick={() => onReorder(s, -1)}
+                        >
+                          ▲
+                        </button>
+                        <span className="stop-num" style={{ background: r.color }}>
+                          {s.stop_number}
+                        </span>
+                        <button
+                          className="btn-plain"
+                          title="Later in the route"
+                          disabled={busy || i === stops.length - 1}
+                          onClick={() => onReorder(s, 1)}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <div className="stop-main">
+                        <div>
+                          {s.eta && <span className="eta">{clock(s.eta)}</span>}
+                          {[s.street, s.unit].filter(Boolean).join(", ")}
+                        </div>
+                        <div className="muted small">
+                          {s.city} {s.zip} · list row {s.seq}
+                          {s.label === "added" && s.added_time_s !== null && s.added_distance_m !== null && (
+                            <>
+                              {" "}
+                              · adds {formatDuration(Math.max(0, s.added_time_s))},{" "}
+                              {formatDistance(Math.max(0, s.added_distance_m), settings.units)}
+                            </>
+                          )}
+                        </div>
+                        <SaveOnBlurInput
+                          trim
+                          className={(text) => `note-input${text ? " note-filled" : ""}`}
+                          value={s.notes}
+                          disabled={busy}
+                          placeholder="Add a note for this address"
+                          maxLength={300}
+                          onSave={(v) => onNotes(s, v)}
+                        />
+                        <div className="chips">
+                          {chip(s)}
+                          {s.is_new_address && r.kind === "volunteer" && <Badge kind="new">New address</Badge>}
+                          {r.kind === "volunteer" && !r.locked && (s.label === "added" || s.label === "manual") && (
+                            <button className="btn btn-small" disabled={busy} onClick={() => onMakeUsual(s)}>
+                              Make usual stop
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <select
+                        className="move"
+                        value=""
+                        disabled={busy || (r.locked && s.label === "usual")}
+                        title={
+                          r.locked && s.label === "usual"
+                            ? "Locked: turn the lock off to move this stop"
+                            : "Move this stop for today"
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "auto") onMove(s, null);
+                          else if (v) onMove(s, Number(v));
+                        }}
+                      >
+                        <option value="">Move…</option>
+                        {s.manual_driver_id !== null && <option value="auto">Back to automatic</option>}
+                        {working
+                          .filter((d) => d.id !== r.driver_id && !(d.locked && d.kind === "volunteer"))
+                          .map((d) => (
+                            <option key={d.id} value={d.id}>
+                              To {d.name}
+                            </option>
+                          ))}
+                      </select>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

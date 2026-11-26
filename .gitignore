@@ -7,3 +7,7 @@ __pycache__/
 backend/data/
 .env
 .ruff_cache/
+.venv/
+.local-build/
+local-data/
+site/

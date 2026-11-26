@@ -5,8 +5,10 @@ from __future__ import annotations
 import contextlib
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from .api import addresses, backup, day, drivers, imports, routes, setup
 from .db import ensure_schema
@@ -33,3 +35,15 @@ for area in (setup, drivers, addresses, day, routes, imports, backup):
 @app.get("/api/health")
 def health():
     return {"ok": True, "map_ready": get_router().ready}
+
+
+def _serve_folder(url: str, env_name: str) -> None:
+    folder = os.environ.get(env_name, "").strip()
+    if folder and Path(folder).is_dir():
+        app.mount(url, StaticFiles(directory=folder, html=True), name=env_name.lower())
+
+
+# In Docker, nginx serves the interface and the help pages. Run without it (see run_local.py)
+# and the API serves them itself. Registered last, so the /api routes above always win.
+_serve_folder("/help", "HELP_DIR")
+_serve_folder("/", "WEB_DIR")

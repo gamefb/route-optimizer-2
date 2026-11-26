@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import vroom
+from vroom import _vroom
 
 
 @dataclass
@@ -27,6 +28,16 @@ class Job:
     priority: int = 0
 
 
+def _matrix(table: list[list[int]]) -> _vroom.Matrix:
+    """A travel table in the form the optimizer's compiled code takes.
+
+    Built here rather than left to the vroom package. Its own conversion asks NumPy for
+    "uint32", which on Windows is a C "unsigned long"; the compiled code wants "unsigned int"
+    and refuses it ("Incompatible buffer format"). np.uintc is "unsigned int" everywhere.
+    """
+    return _vroom.Matrix(np.array(table, dtype=np.uintc))
+
+
 def solve(
     vehicles: list[Vehicle], jobs: list[Job], tables: dict[str, tuple[list, list]], objective: str
 ) -> tuple[dict[int, list[int]], list[int]]:
@@ -44,12 +55,11 @@ def solve(
     problem = vroom.Input()
     for profile in {v.profile for v in vehicles}:
         durations, distances = tables[profile]
-        dur = np.array(durations, dtype=np.uint32)
-        dist = np.array(distances, dtype=np.uint32)
-        problem.set_durations_matrix(profile=profile, matrix_input=dur)
-        problem.set_distances_matrix(profile=profile, matrix_input=dist)
+        # A fresh matrix for each call: the optimizer takes over the one it is given.
+        problem.set_durations_matrix(profile=profile, matrix_input=_matrix(durations))
+        problem.set_distances_matrix(profile=profile, matrix_input=_matrix(distances))
         if objective == "distance":
-            problem.set_costs_matrix(profile=profile, matrix_input=dist)
+            problem.set_costs_matrix(profile=profile, matrix_input=_matrix(distances))
 
     for v in vehicles:
         kwargs = dict(id=v.id, start=v.start, end=v.end, profile=v.profile, skills=set(v.skills))

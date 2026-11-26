@@ -39,6 +39,37 @@ export function ErrorNote({ message }: { message: string }) {
   return message ? <div className="note note-error">{message}</div> : null;
 }
 
+/**
+ * A message pinned to the bottom of the window, so it is seen wherever the page is scrolled.
+ * It stays until it is closed or the next action starts.
+ */
+export function Toast({
+  kind,
+  onClose,
+  children,
+}: {
+  kind: "error" | "info";
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`toast toast-${kind}`} role={kind === "error" ? "alert" : "status"}>
+      <div className="toast-body">{children}</div>
+      <button className="btn-plain" onClick={onClose} aria-label="Close this message">
+        ✕
+      </button>
+    </div>
+  );
+}
+
+export function ErrorToast({ message, onClose }: { message: string; onClose: () => void }) {
+  return message ? (
+    <Toast kind="error" onClose={onClose}>
+      {message}
+    </Toast>
+  ) : null;
+}
+
 export function Badge({ kind, children }: { kind: string; children: ReactNode }) {
   return <span className={`badge badge-${kind}`}>{children}</span>;
 }

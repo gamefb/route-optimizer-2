@@ -31,6 +31,16 @@ class RoutingError(Exception):
     pass
 
 
+def _tool_env() -> dict[str, str]:
+    """The environment for the routing package's command-line tools.
+
+    They are found on PATH. Inside a virtual environment their folder is only on
+    PATH if the environment was activated, so put it there ourselves.
+    """
+    scripts = str(Path(sys.executable).parent)
+    return {**os.environ, "PATH": scripts + os.pathsep + os.environ.get("PATH", "")}
+
+
 class Router:
     def __init__(self, data_dir: Path = DATA_DIR):
         self.data_dir = Path(data_dir)
@@ -113,8 +123,8 @@ class Router:
             raise RoutingError(self.state.get("message") or "Map build failed")
 
     def _fetch(self, url: str, dest: Path) -> None:
-        if url.startswith("file://") or url.startswith("/"):
-            src = Path(url.replace("file://", "", 1))
+        if not url.startswith(("http://", "https://")):  # a map file already on this computer
+            src = Path(url.removeprefix("file://"))
             if not src.exists():
                 raise RoutingError(f"Map file not found: {src}")
             shutil.copyfile(src, dest)
@@ -147,6 +157,7 @@ class Router:
                 [sys.executable, "-m", "valhalla", "valhalla_build_tiles", "-c", str(cfg), str(pbf)],
                 capture_output=True,
                 text=True,
+                env=_tool_env(),
             )
             tiles = list((region_dir / "tiles").rglob("*.gph"))
             if proc.returncode != 0 or not tiles:

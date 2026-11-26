@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -109,8 +111,8 @@ def region_catalog():
 @router.post("/api/region")
 def region_build(body: RegionIn):
     url = body.url.strip()
-    if not (url.startswith("http://") or url.startswith("https://") or url.startswith("/")):
-        bad("Give a link to an .osm.pbf map file, or a path inside the map data folder.")
+    if not (url.startswith(("http://", "https://")) or Path(url).is_absolute()):
+        bad("Give a link to an .osm.pbf map file, or the full path of one on the computer running the app.")
     try:
         get_router().start_build(body.name.strip() or "Custom region", url)
     except RoutingError as exc:

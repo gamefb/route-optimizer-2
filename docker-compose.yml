@@ -2,9 +2,13 @@
 # internal network and do not expose the port to the public internet.
 services:
   web:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
-      - "${WEB_PORT:-8080}:80"
+      # WEB_BIND decides who can open the app. The default lets other computers on your network in.
+      # Set WEB_BIND=127.0.0.1 in .env to allow this computer only.
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:80"
     depends_on:
       - api
     restart: unless-stopped
